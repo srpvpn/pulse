@@ -163,7 +163,10 @@ class PulseApplication(ApplicationBase):
         return due_rituals
 
     def do_activate(self):  # pragma: no cover - GTK callback
-        window = PulseMainWindow(application=self, initial_state=self.build_state())
+        try:
+            window = PulseMainWindow(application=self, initial_state=self.build_state())
+        except RuntimeError:
+            return
         if hasattr(window, "present"):
             window.present()
         self._window = window
