@@ -3,7 +3,7 @@
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, List, Union
+from typing import Iterable, Iterator, List, Optional, Union
 
 
 SCHEMA_STATEMENTS = (
@@ -99,3 +99,71 @@ class Database:
                 """
             ).fetchall()
         return [row["name"] for row in rows]
+
+    def save_evening_input(
+        self,
+        date: str,
+        hourly_samples: Iterable[object],
+        sleep_hours: Optional[float] = None,
+        physical_activity: Optional[str] = None,
+        stress_level: Optional[str] = None,
+        free_note: Optional[str] = None,
+    ) -> None:
+        rows = _dedupe_hourly_samples(hourly_samples)
+        with self.connect() as connection:
+            connection.execute("DELETE FROM energy_logs WHERE date = ?", (date,))
+            connection.executemany(
+                """
+                INSERT INTO energy_logs (date, hour, level)
+                VALUES (?, ?, ?)
+                """,
+                [(date, sample.hour, sample.level) for sample in rows],
+            )
+            connection.execute(
+                """
+                INSERT INTO daily_context (
+                    date,
+                    sleep_hours,
+                    physical_activity,
+                    stress_level,
+                    free_note
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(date) DO UPDATE SET
+                    sleep_hours = excluded.sleep_hours,
+                    physical_activity = excluded.physical_activity,
+                    stress_level = excluded.stress_level,
+                    free_note = excluded.free_note
+                """,
+                (date, sleep_hours, physical_activity, stress_level, free_note),
+            )
+
+
+def _dedupe_hourly_samples(hourly_samples: Iterable[object]) -> List[object]:
+    samples_by_hour = {}
+    for sample in hourly_samples:
+        hour = _clamp_hour(sample.hour)
+        level = _clamp_level(sample.level)
+        samples_by_hour[hour] = _StoredHourlySample(hour=hour, level=level)
+    return [samples_by_hour[hour] for hour in sorted(samples_by_hour)]
+
+
+class _StoredHourlySample(object):
+    def __init__(self, hour: int, level: float) -> None:
+        self.hour = hour
+        self.level = level
+
+
+def _clamp_hour(value: object) -> int:
+    try:
+        hour = int(value)
+    except (TypeError, ValueError):
+        hour = 8
+    return max(8, min(23, hour))
+
+
+def _clamp_level(value: object) -> float:
+    try:
+        level = float(value)
+    except (TypeError, ValueError):
+        level = 1.0
+    return max(1.0, min(10.0, level))
