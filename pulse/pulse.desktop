@@ -2,7 +2,7 @@
 Type=Application
 Name=Pulse
 Comment=Personal burnout and energy monitor
-Exec=pulse
+Exec=python3 -m pulse.main
 Icon=com.example.Pulse
 Terminal=false
 Categories=Utility;
