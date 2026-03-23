@@ -63,6 +63,16 @@ SCHEMA_STATEMENTS = (
         note TEXT
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS ritual_deliveries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        ritual_id TEXT NOT NULL,
+        delivered_time TEXT NOT NULL,
+        created TEXT DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(date, ritual_id)
+    )
+    """,
 )
 
 
@@ -99,6 +109,79 @@ class Database:
                 """
             ).fetchall()
         return [row["name"] for row in rows]
+
+    def save_ritual(
+        self,
+        ritual_id: str,
+        label: str,
+        time: str,
+        active: bool = True,
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO rituals (ritual_id, label, time, active)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(ritual_id) DO UPDATE SET
+                    label = excluded.label,
+                    time = excluded.time,
+                    active = excluded.active
+                """,
+                (ritual_id, label, time, 1 if active else 0),
+            )
+
+    def list_rituals(self) -> List[sqlite3.Row]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT ritual_id, label, time, active
+                FROM rituals
+                ORDER BY time, label
+                """
+            ).fetchall()
+        return rows
+
+    def list_active_rituals(self) -> List[sqlite3.Row]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT ritual_id, label, time, active
+                FROM rituals
+                WHERE active = 1
+                ORDER BY time, label
+                """
+            ).fetchall()
+        return rows
+
+    def mark_ritual_delivered(
+        self,
+        current_date: str,
+        ritual_id: str,
+        delivered_time: str,
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO ritual_deliveries (date, ritual_id, delivered_time)
+                VALUES (?, ?, ?)
+                ON CONFLICT(date, ritual_id) DO UPDATE SET
+                    delivered_time = excluded.delivered_time
+                """,
+                (current_date, ritual_id, delivered_time),
+            )
+
+    def list_delivered_ritual_ids(self, current_date: str) -> List[str]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT ritual_id
+                FROM ritual_deliveries
+                WHERE date = ?
+                ORDER BY delivered_time, ritual_id
+                """,
+                (current_date,),
+            ).fetchall()
+        return [row["ritual_id"] for row in rows]
 
     def save_evening_input(
         self,

@@ -1,13 +1,15 @@
 """Application entry point for Pulse."""
 
 import json
+from datetime import date as date_class
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import List, Optional, Sequence
 
 from pulse.db import Database
 from pulse.ui.main_window import PulseMainWindow
 from pulse.ui.onboarding import normalize_reminder_time
+from pulse.ui.rituals import Ritual, due_rituals_for_time, to_rituals
 
 
 @dataclass(frozen=True)
@@ -35,7 +37,20 @@ def _load_gtk():
         return None
 
 
+def _load_gio():
+    try:
+        import gi
+
+        gi.require_version("Gio", "2.0")
+        from gi.repository import Gio  # type: ignore
+
+        return Gio
+    except (ImportError, ValueError):
+        return None
+
+
 Adw = _load_gtk()
+Gio = _load_gio()
 
 
 if Adw is None:
@@ -109,6 +124,44 @@ class PulseApplication(ApplicationBase):
         self.save_settings(settings)
         return self.build_state()
 
+    def load_rituals(self) -> List[Ritual]:
+        return to_rituals(self.database.list_active_rituals())
+
+    def plan_notifications(
+        self,
+        current_time: str,
+        current_date: Optional[str] = None,
+    ) -> List[Ritual]:
+        date_text = _resolve_current_date(current_date)
+        delivered_ritual_ids = self.database.list_delivered_ritual_ids(date_text)
+        return due_rituals_for_time(
+            self.load_rituals(),
+            current_time,
+            delivered_ritual_ids=delivered_ritual_ids,
+        )
+
+    def notify_due_rituals(
+        self,
+        current_time: str,
+        current_date: Optional[str] = None,
+    ) -> List[Ritual]:
+        date_text = _resolve_current_date(current_date)
+        due_rituals = self.plan_notifications(current_time=current_time, current_date=date_text)
+
+        for ritual in due_rituals:
+            self.database.mark_ritual_delivered(
+                current_date=date_text,
+                ritual_id=ritual.ritual_id,
+                delivered_time=current_time,
+            )
+            if Gio is None:
+                continue
+            if hasattr(self, "send_notification"):
+                notification = Gio.Notification.new(ritual.label)
+                notification.set_body("Time for {}".format(ritual.label))
+                self.send_notification(ritual.ritual_id, notification)
+        return due_rituals
+
     def do_activate(self):  # pragma: no cover - GTK callback
         window = PulseMainWindow(application=self, initial_state=self.build_state())
         if hasattr(window, "present"):
@@ -123,6 +176,12 @@ def build_application(data_dir: Optional[Path] = None) -> PulseApplication:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     application = build_application()
     return application.run(argv)
+
+
+def _resolve_current_date(current_date: Optional[str]) -> str:
+    if current_date:
+        return current_date
+    return date_class.today().isoformat()
 
 
 if __name__ == "__main__":
