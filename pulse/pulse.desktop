@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Pulse
+Comment=Personal burnout and energy monitor
+Exec=pulse
+Icon=com.example.Pulse
+Terminal=false
+Categories=Utility;
