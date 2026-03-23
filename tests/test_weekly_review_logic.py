@@ -9,7 +9,7 @@ def test_build_weekly_review_view_model_formats_summary_and_rotates_science_card
     )
 
     assert view_model.energy_summary == "Average energy 6.8 this week vs 5.5 last week (+1.3)"
-    assert view_model.mbi_correction == -2.0
+    assert round(view_model.mbi_correction, 1) == -3.3
     assert view_model.science_card.title == "Psychological detachment"
     assert "switching off" in view_model.science_card.body.lower()
 
@@ -27,3 +27,12 @@ def test_build_weekly_review_view_model_returns_first_science_card_for_week_zero
     assert view_model.science_card.title == "Ultradian rhythms"
     assert view_model.energy_summary == "Average energy 5.0 this week vs 5.0 last week (+0.0)"
     assert view_model.mbi_correction == 0.0
+
+
+def test_compute_mbi_correction_clips_to_intended_range():
+    from pulse.ui.weekly_review import MBICheckin, compute_mbi_correction
+
+    assert compute_mbi_correction(MBICheckin(exhaustion=4, cynicism=4, efficacy=0)) == -10.0
+    assert compute_mbi_correction(MBICheckin(exhaustion=0, cynicism=0, efficacy=4)) == 10.0
+    assert compute_mbi_correction(MBICheckin(exhaustion=9, cynicism=9, efficacy=-2)) == -10.0
+    assert compute_mbi_correction(MBICheckin(exhaustion=-3, cynicism=-3, efficacy=9)) == 10.0

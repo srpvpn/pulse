@@ -103,8 +103,11 @@ def compute_mbi_correction(mbi_checkin: Optional[MBICheckin]) -> float:
     if mbi_checkin is None:
         return 0.0
 
-    raw_score = mbi_checkin.efficacy - mbi_checkin.exhaustion - mbi_checkin.cynicism
-    return _clamp(raw_score / 2.0, -10.0, 10.0)
+    exhaustion = _clamp(mbi_checkin.exhaustion, 0.0, 4.0)
+    cynicism = _clamp(mbi_checkin.cynicism, 0.0, 4.0)
+    efficacy = _clamp(mbi_checkin.efficacy, 0.0, 4.0)
+    raw_score = exhaustion + cynicism + (4.0 - efficacy)
+    return _clamp(-(((raw_score - 6.0) / 6.0) * 10.0), -10.0, 10.0)
 
 
 def _clamp(value: float, lower: float, upper: float) -> float:

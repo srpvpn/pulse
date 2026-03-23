@@ -78,10 +78,11 @@ def summarize_burnout_trajectory(scores: Sequence[BurnoutScoreResult]) -> str:
     if len(ordered_scores) < 2:
         return "Burnout score is steady"
 
-    if _is_strictly_falling(ordered_scores):
-        return "Burnout score has fallen for {:d} days".format(len(ordered_scores))
-    if _is_strictly_rising(ordered_scores):
-        return "Burnout score has risen for {:d} days".format(len(ordered_scores))
+    direction, streak_length = _latest_monotonic_streak(ordered_scores)
+    if direction == "falling":
+        return "Burnout score has fallen for {:d} days".format(streak_length)
+    if direction == "rising":
+        return "Burnout score has risen for {:d} days".format(streak_length)
     return "Burnout score is moving sideways"
 
 
@@ -95,12 +96,30 @@ def build_heatmap_cell(point: DailyEnergyPoint) -> HeatmapCell:
     )
 
 
-def _is_strictly_falling(values: Sequence[float]) -> bool:
-    return all(current < previous for previous, current in zip(values, values[1:]))
+def _latest_monotonic_streak(values: Sequence[float]) -> tuple:
+    if len(values) < 2:
+        return None, 0
 
+    direction = None
+    streak_length = 0
+    index = len(values) - 1
 
-def _is_strictly_rising(values: Sequence[float]) -> bool:
-    return all(current > previous for previous, current in zip(values, values[1:]))
+    while index > 0:
+        current = values[index]
+        previous = values[index - 1]
+        if current == previous:
+            break
+
+        pair_direction = "rising" if current > previous else "falling"
+        if direction is None:
+            direction = pair_direction
+        elif pair_direction != direction:
+            break
+
+        streak_length += 1
+        index -= 1
+
+    return direction, streak_length
 
 
 def _color_for_energy(energy: float) -> str:
