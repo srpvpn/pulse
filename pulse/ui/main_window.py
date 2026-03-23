@@ -39,3 +39,10 @@ class PulseMainWindow(WindowBase):
     def __init__(self, application: Optional[object] = None, initial_state: Optional[object] = None) -> None:
         super(PulseMainWindow, self).__init__(application=application)
         self.initial_state = initial_state
+        self.current_view = getattr(initial_state, "current_view", "onboarding")
+        self.reminder_time = getattr(initial_state, "reminder_time", "20:00")
+
+    def set_state(self, state: Optional[object]) -> None:
+        self.initial_state = state
+        self.current_view = getattr(state, "current_view", self.current_view)
+        self.reminder_time = getattr(state, "reminder_time", self.reminder_time)
