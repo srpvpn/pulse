@@ -2,8 +2,12 @@
 
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Iterator, List, Optional, Union
+
+from pulse.burnout_engine import BurnoutEntry, compute_burnout_score
+from pulse.ui.weekly_review import MBICheckin, compute_mbi_correction
 
 
 SCHEMA_STATEMENTS = (
@@ -30,7 +34,7 @@ SCHEMA_STATEMENTS = (
     """
     CREATE TABLE IF NOT EXISTS mbi_checkins (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        date TEXT NOT NULL UNIQUE,
+        week TEXT NOT NULL UNIQUE,
         exhaustion INTEGER NOT NULL,
         cynicism INTEGER NOT NULL,
         efficacy INTEGER NOT NULL
@@ -97,6 +101,7 @@ class Database:
         with self.connect() as connection:
             for statement in SCHEMA_STATEMENTS:
                 connection.execute(statement)
+            self._migrate_schema(connection)
 
     def list_tables(self) -> List[str]:
         with self.connect() as connection:
@@ -152,6 +157,81 @@ class Database:
                 """
             ).fetchall()
         return rows
+
+    def save_mbi_checkin(
+        self,
+        current_date: str,
+        exhaustion: int,
+        cynicism: int,
+        efficacy: int,
+    ) -> None:
+        self.save_weekly_checkin(
+            week=current_date,
+            exhaustion=exhaustion,
+            cynicism=cynicism,
+            efficacy=efficacy,
+            note="",
+        )
+
+    def save_weekly_checkin(
+        self,
+        week: str,
+        exhaustion: int,
+        cynicism: int,
+        efficacy: int,
+        note: str,
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO mbi_checkins (week, exhaustion, cynicism, efficacy)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(week) DO UPDATE SET
+                    exhaustion = excluded.exhaustion,
+                    cynicism = excluded.cynicism,
+                    efficacy = excluded.efficacy
+                """,
+                (
+                    week,
+                    int(exhaustion),
+                    int(cynicism),
+                    int(efficacy),
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO weekly_notes (week, note)
+                VALUES (?, ?)
+                ON CONFLICT(week) DO UPDATE SET
+                    note = excluded.note
+                """,
+                (week, note),
+            )
+            self._recompute_burnout_scores(connection, start_date=week)
+
+    def latest_mbi_checkin(self) -> Optional[sqlite3.Row]:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT week, exhaustion, cynicism, efficacy
+                FROM mbi_checkins
+                ORDER BY week DESC
+                LIMIT 1
+                """
+            ).fetchone()
+        return row
+
+    def weekly_note_for_week(self, week: str) -> Optional[str]:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT note
+                FROM weekly_notes
+                WHERE week = ?
+                """,
+                (week,),
+            ).fetchone()
+        return None if row is None else row["note"]
 
     def mark_ritual_delivered(
         self,
@@ -219,6 +299,155 @@ class Database:
                 """,
                 (date, sleep_hours, physical_activity, stress_level, free_note),
             )
+            self._recompute_burnout_scores(connection)
+
+    def _migrate_schema(self, connection: sqlite3.Connection) -> None:
+        mbi_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(mbi_checkins)").fetchall()
+        }
+        if "week" not in mbi_columns and "date" in mbi_columns:
+            self._rebuild_mbi_checkins_table(connection)
+            return
+
+        if "date" in mbi_columns:
+            date_column = next(
+                row
+                for row in connection.execute("PRAGMA table_info(mbi_checkins)").fetchall()
+                if row["name"] == "date"
+            )
+            if int(date_column["notnull"]) == 1:
+                self._rebuild_mbi_checkins_table(connection)
+
+    def _rebuild_mbi_checkins_table(self, connection: sqlite3.Connection) -> None:
+        existing_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(mbi_checkins)").fetchall()
+        }
+        source_week_expression = "COALESCE(week, date)" if "week" in existing_columns else "date"
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS mbi_checkins_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                week TEXT NOT NULL UNIQUE,
+                exhaustion INTEGER NOT NULL,
+                cynicism INTEGER NOT NULL,
+                efficacy INTEGER NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO mbi_checkins_new (id, week, exhaustion, cynicism, efficacy)
+            SELECT id,
+                   {source_week_expression},
+                   exhaustion,
+                   cynicism,
+                   efficacy
+            FROM mbi_checkins
+            """.format(source_week_expression=source_week_expression)
+        )
+        connection.execute("DROP TABLE mbi_checkins")
+        connection.execute("ALTER TABLE mbi_checkins_new RENAME TO mbi_checkins")
+        connection.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_mbi_checkins_week
+            ON mbi_checkins(week)
+            """
+        )
+
+    def _recompute_burnout_scores(
+        self,
+        connection: sqlite3.Connection,
+        start_date: Optional[str] = None,
+    ) -> None:
+        rows = connection.execute(
+            """
+            SELECT e.date AS date,
+                   AVG(e.level) AS average_energy,
+                   c.sleep_hours AS sleep_hours,
+                   c.stress_level AS stress_level,
+                   c.physical_activity AS physical_activity
+            FROM energy_logs e
+            LEFT JOIN daily_context c ON c.date = e.date
+            GROUP BY e.date
+            ORDER BY e.date
+            """
+        ).fetchall()
+        if not rows:
+            connection.execute("DELETE FROM burnout_scores")
+            return
+
+        entries = [
+            BurnoutEntry(
+                date=row["date"],
+                average_energy=float(row["average_energy"]),
+                sleep_hours=row["sleep_hours"],
+                stress_level=row["stress_level"],
+                physical_activity=row["physical_activity"],
+            )
+            for row in rows
+        ]
+        corrections = self._load_mbi_corrections_by_week(connection)
+
+        for index, entry in enumerate(entries, start=1):
+            if start_date is not None and entry.date < start_date:
+                continue
+            correction = _mbi_correction_for_date(entry.date, corrections)
+            result = compute_burnout_score(entries[:index], mbi_correction=correction)
+            connection.execute(
+                """
+                INSERT INTO burnout_scores (date, score, ali, rqs, trend_penalty, mbi_correction)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date) DO UPDATE SET
+                    score = excluded.score,
+                    ali = excluded.ali,
+                    rqs = excluded.rqs,
+                    trend_penalty = excluded.trend_penalty,
+                    mbi_correction = excluded.mbi_correction
+                """,
+                (
+                    entry.date,
+                    result.score,
+                    result.ali,
+                    result.rqs,
+                    result.trend_penalty,
+                    result.mbi_correction,
+                ),
+            )
+
+        if start_date is not None:
+            connection.execute(
+                """
+                DELETE FROM burnout_scores
+                WHERE date >= ?
+                  AND date NOT IN (
+                      SELECT DISTINCT date FROM energy_logs
+                  )
+                """,
+                (start_date,),
+            )
+
+    def _load_mbi_corrections_by_week(self, connection: sqlite3.Connection):
+        rows = connection.execute(
+            """
+            SELECT week, exhaustion, cynicism, efficacy
+            FROM mbi_checkins
+            WHERE week IS NOT NULL
+            ORDER BY week
+            """
+        ).fetchall()
+        return [
+            (
+                row["week"],
+                compute_mbi_correction(
+                    MBICheckin(
+                        exhaustion=int(row["exhaustion"]),
+                        cynicism=int(row["cynicism"]),
+                        efficacy=int(row["efficacy"]),
+                    )
+                ),
+            )
+            for row in rows
+        ]
 
 
 def _dedupe_hourly_samples(hourly_samples: Iterable[object]) -> List[object]:
@@ -250,3 +479,15 @@ def _clamp_level(value: object) -> float:
     except (TypeError, ValueError):
         level = 1.0
     return max(1.0, min(10.0, level))
+
+
+def _mbi_correction_for_date(date_text: str, corrections_by_week) -> float:
+    current_date = datetime.strptime(date_text, "%Y-%m-%d").date()
+    latest = 0.0
+    for week_text, correction in corrections_by_week:
+        week_date = datetime.strptime(week_text, "%Y-%m-%d").date()
+        if week_date <= current_date:
+            latest = correction
+            continue
+        break
+    return latest

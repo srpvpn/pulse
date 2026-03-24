@@ -4,6 +4,9 @@ from datetime import date as date_class
 from dataclasses import dataclass
 from typing import Callable, List, Sequence
 
+from pulse.i18n import tr
+from pulse.ui.theme import apply_classes, build_responsive_page
+
 
 DAY_START_HOUR = 8
 DAY_END_HOUR = 23
@@ -21,6 +24,56 @@ class HourlyEnergySample:
     level: float
 
 
+@dataclass(frozen=True)
+class EveningPageModel:
+    title: str
+    subtitle: str
+    primary_action: str
+    section_titles: tuple
+    has_summary_card: bool
+    choice_style: str
+    sticky_primary_action: bool
+    fills_viewport: bool
+    large_primary_action: bool
+    max_content_width: int
+    responsive_layout: bool
+    scroll_policy: str
+
+
+@dataclass(frozen=True)
+class CurveEditorLayout:
+    minimum_width: int
+    height: int
+
+
+def build_evening_page_model(language: str = "en") -> EveningPageModel:
+    return EveningPageModel(
+        title=tr(language, "evening.title"),
+        subtitle=tr(language, "evening.subtitle"),
+        primary_action=tr(language, "evening.save"),
+        section_titles=(
+            tr(language, "evening.energy_curve"),
+            tr(language, "evening.recovery_inputs"),
+            tr(language, "evening.context_note"),
+        ),
+        has_summary_card=False,
+        choice_style="compact",
+        sticky_primary_action=False,
+        fills_viewport=True,
+        large_primary_action=True,
+        max_content_width=960,
+        responsive_layout=True,
+        scroll_policy="automatic",
+    )
+
+
+def build_curve_editor_layout() -> CurveEditorLayout:
+    return CurveEditorLayout(
+        minimum_width=280,
+        height=280,
+    )
+
+
 def sample_energy_curve(
     curve_points: Sequence[CurvePoint],
     start_hour: int = DAY_START_HOUR,
@@ -36,6 +89,28 @@ def sample_energy_curve(
         level = _sample_level_at(points, minute_offset)
         hourly_samples.append(HourlyEnergySample(hour=hour, level=level))
     return hourly_samples
+
+
+def catmull_rom_points(
+    points: Sequence[CurvePoint],
+    num_segments: int = 20,
+) -> List[CurvePoint]:
+    ordered_points = _sort_points(points)
+    if len(ordered_points) <= 1:
+        return ordered_points
+
+    smoothed = [ordered_points[0]]
+    for index in range(len(ordered_points) - 1):
+        p0 = ordered_points[index - 1] if index > 0 else ordered_points[index]
+        p1 = ordered_points[index]
+        p2 = ordered_points[index + 1]
+        p3 = ordered_points[index + 2] if index + 2 < len(ordered_points) else ordered_points[index + 1]
+
+        for step in range(1, max(1, num_segments)):
+            t = step / float(num_segments)
+            smoothed.append(_catmull_rom_interpolate(p0, p1, p2, p3, t))
+        smoothed.append(CurvePoint(minute_offset=p2.minute_offset, level=_sanitize_level(p2.level)))
+    return smoothed
 
 
 def _sort_points(curve_points: Sequence[CurvePoint]) -> List[CurvePoint]:
@@ -78,6 +153,33 @@ def _sanitize_level(level: object) -> float:
     return max(1.0, min(10.0, value))
 
 
+def _catmull_rom_interpolate(
+    p0: CurvePoint,
+    p1: CurvePoint,
+    p2: CurvePoint,
+    p3: CurvePoint,
+    t: float,
+) -> CurvePoint:
+    t2 = t * t
+    t3 = t2 * t
+    minute_offset = 0.5 * (
+        (2 * p1.minute_offset)
+        + (-p0.minute_offset + p2.minute_offset) * t
+        + (2 * p0.minute_offset - 5 * p1.minute_offset + 4 * p2.minute_offset - p3.minute_offset) * t2
+        + (-p0.minute_offset + 3 * p1.minute_offset - 3 * p2.minute_offset + p3.minute_offset) * t3
+    )
+    level = 0.5 * (
+        (2 * p1.level)
+        + (-p0.level + p2.level) * t
+        + (2 * p0.level - 5 * p1.level + 4 * p2.level - p3.level) * t2
+        + (-p0.level + 3 * p1.level - 3 * p2.level + p3.level) * t3
+    )
+    return CurvePoint(
+        minute_offset=int(round(minute_offset)),
+        level=_sanitize_level(level),
+    )
+
+
 def _load_ui():
     try:
         import gi
@@ -95,63 +197,91 @@ Gtk = _load_ui()
 
 def create_evening_page(
     on_save: Callable[[str, Sequence[HourlyEnergySample], dict], None],
+    language: str = "en",
 ):
     if Gtk is None:
         return None
+    page = build_evening_page_model(language=language)
 
     content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
-    content.set_margin_top(24)
-    content.set_margin_bottom(24)
-    content.set_margin_start(24)
-    content.set_margin_end(24)
 
-    title = Gtk.Label(label="Evening Input", xalign=0.0)
-    title.add_css_class("title-2")
+    title = Gtk.Label(label=page.title, xalign=0.0)
+    apply_classes(title, "pulse-hero-title")
     subtitle = Gtk.Label(
-        label="Draw your day from 08:00 to 23:00, then save sleep, activity, stress, and a short note.",
+        label=page.subtitle,
         wrap=True,
         xalign=0.0,
     )
-    subtitle.add_css_class("dim-label")
+    apply_classes(subtitle, "pulse-subtle")
     content.append(title)
     content.append(subtitle)
 
     editor = _create_curve_editor()
     editor_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-    editor_card.add_css_class("card")
-    editor_card.set_margin_start(12)
-    editor_card.set_margin_end(12)
+    apply_classes(editor_card, "pulse-card-glass")
+    editor_card.set_hexpand(True)
+    chart_title = Gtk.Label(label=page.section_titles[0], xalign=0.0)
+    apply_classes(chart_title, "heading")
+    chart_hint = Gtk.Label(
+        label=tr(language, "evening.chart_hint"),
+        wrap=True,
+        xalign=0.0,
+    )
+    apply_classes(chart_hint, "pulse-subtle")
+    editor_card.append(chart_title)
+    editor_card.append(chart_hint)
     editor_card.append(editor)
     content.append(editor_card)
 
     sleep_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-    sleep_row.add_css_class("card")
-    sleep_row.set_margin_start(12)
-    sleep_row.set_margin_end(12)
-    sleep_row.append(Gtk.Label(label="Sleep hours", xalign=0.0))
+    apply_classes(sleep_row, "pulse-card")
+    recovery_title = Gtk.Label(label=page.section_titles[1], xalign=0.0)
+    apply_classes(recovery_title, "heading")
+    sleep_row.append(recovery_title)
+    sleep_row.append(Gtk.Label(label=tr(language, "evening.sleep_hours"), xalign=0.0))
     sleep_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 4.0, 10.0, 0.5)
     sleep_scale.set_value(7.0)
     sleep_scale.set_draw_value(True)
     sleep_row.append(sleep_scale)
     content.append(sleep_row)
 
-    activity_selector = _build_choice_selector("Physical activity", ("No", "Some", "Yes"), "Some")
-    stress_selector = _build_choice_selector("External stress", ("Low", "Medium", "High"), "Medium")
+    activity_selector = _build_choice_selector(
+        tr(language, "evening.activity"),
+        (
+            tr(language, "option.no"),
+            tr(language, "option.some"),
+            tr(language, "option.yes"),
+        ),
+        tr(language, "option.some"),
+    )
+    stress_selector = _build_choice_selector(
+        tr(language, "evening.stress"),
+        (
+            tr(language, "option.low"),
+            tr(language, "option.medium"),
+            tr(language, "option.high"),
+        ),
+        tr(language, "option.medium"),
+    )
     content.append(activity_selector["container"])
     content.append(stress_selector["container"])
 
     note_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-    note_card.add_css_class("card")
-    note_card.set_margin_start(12)
-    note_card.set_margin_end(12)
-    note_card.append(Gtk.Label(label="What affected your energy today?", xalign=0.0))
+    apply_classes(note_card, "pulse-card")
+    note_title = Gtk.Label(label=page.section_titles[2], xalign=0.0)
+    apply_classes(note_title, "heading")
+    note_card.append(note_title)
+    note_card.append(Gtk.Label(label=tr(language, "evening.note_prompt"), xalign=0.0))
     note_entry = Gtk.Entry()
-    note_entry.set_placeholder_text("Optional note")
+    note_entry.set_placeholder_text(tr(language, "evening.note_placeholder"))
     note_card.append(note_entry)
     content.append(note_card)
 
-    save_button = Gtk.Button(label="Save today")
+    save_button = Gtk.Button(label=page.primary_action)
     save_button.add_css_class("suggested-action")
+    save_button.set_hexpand(True)
+    save_button.set_halign(Gtk.Align.FILL)
+    apply_classes(save_button, "pulse-primary-button")
 
     def handle_save(_button):
         samples = sample_energy_curve(editor.points)
@@ -166,35 +296,46 @@ def create_evening_page(
     save_button.connect("clicked", handle_save)
     content.append(save_button)
 
-    scroller = Gtk.ScrolledWindow()
-    scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-    scroller.set_child(content)
-    return scroller
+    return build_responsive_page(
+        content,
+        "evening",
+        horizontal_policy=Gtk.PolicyType.AUTOMATIC,
+        vertical_policy=Gtk.PolicyType.AUTOMATIC,
+    )
 
 
 def _build_choice_selector(title: str, options: Sequence[str], selected: str):
     container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-    container.add_css_class("card")
-    container.set_margin_start(12)
-    container.set_margin_end(12)
-    container.append(Gtk.Label(label=title, xalign=0.0))
-    row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    title_label = Gtk.Label(label=title, xalign=0.0)
+    apply_classes(title_label, "pulse-subtle")
+    container.append(title_label)
+    row = Gtk.FlowBox()
+    row.set_selection_mode(Gtk.SelectionMode.NONE)
+    row.set_max_children_per_line(3)
+    row.set_min_children_per_line(1)
+    row.set_column_spacing(6)
+    row.set_row_spacing(6)
     buttons = []
     current = {"value": selected}
 
     def on_clicked(button, value):
         current["value"] = value
         for other in buttons:
-            other.set_sensitive(other is not button)
+            if hasattr(other, "remove_css_class"):
+                other.remove_css_class("suggested-action")
+            other.set_sensitive(True)
+        button.add_css_class("suggested-action")
+        button.set_sensitive(False)
 
     for option in options:
         button = Gtk.Button(label=option)
+        apply_classes(button, "pulse-nav-item")
         if option == selected:
             button.add_css_class("suggested-action")
             button.set_sensitive(False)
         button.connect("clicked", on_clicked, option)
         buttons.append(button)
-        row.append(button)
+        row.insert(button, -1)
     container.append(row)
 
     def get_value():
@@ -207,14 +348,16 @@ def _create_curve_editor():
     class EnergyCurveEditor(Gtk.DrawingArea):
         def __init__(self):
             super().__init__()
+            layout = build_curve_editor_layout()
             self.points = [
                 CurvePoint(0, 6.0),
                 CurvePoint(240, 7.5),
                 CurvePoint(540, 4.5),
                 CurvePoint(900, 5.0),
             ]
-            self.set_content_width(860)
-            self.set_content_height(280)
+            self.set_hexpand(True)
+            self.set_vexpand(False)
+            self.set_size_request(layout.minimum_width, layout.height)
             self.set_draw_func(self._draw)
             self._drag_origin_x = 0.0
             self._drag_origin_y = 0.0
@@ -257,16 +400,13 @@ def _create_curve_editor():
             if not points:
                 return
 
-            context.set_line_width(3.0)
-            context.set_source_rgb(0.1137, 0.6196, 0.4588)
-            first = points[0]
-            context.move_to(self._x_for_offset(first.minute_offset, width), self._y_for_level(first.level, height))
-            for point in points[1:]:
-                context.line_to(self._x_for_offset(point.minute_offset, width), self._y_for_level(point.level, height))
-            context.stroke()
+            smooth_points = catmull_rom_points(points)
+            self._draw_fill(context, smooth_points, width, height)
+            self._draw_line(context, smooth_points, width, height)
 
             for point in points:
-                context.set_source_rgb(0.1137, 0.6196, 0.4588)
+                red, green, blue = _rgb_for_level(point.level)
+                context.set_source_rgb(red, green, blue)
                 context.arc(
                     self._x_for_offset(point.minute_offset, width),
                     self._y_for_level(point.level, height),
@@ -282,4 +422,49 @@ def _create_curve_editor():
         def _y_for_level(self, level, height):
             return ((10.0 - _sanitize_level(level)) / 9.0) * height
 
+        def _draw_line(self, context, points, width, height):
+            if len(points) < 2:
+                return
+            context.set_line_width(2.5)
+            for left, right in zip(points, points[1:]):
+                red, green, blue = _rgb_for_level((left.level + right.level) / 2.0)
+                context.set_source_rgb(red, green, blue)
+                context.move_to(
+                    self._x_for_offset(left.minute_offset, width),
+                    self._y_for_level(left.level, height),
+                )
+                context.line_to(
+                    self._x_for_offset(right.minute_offset, width),
+                    self._y_for_level(right.level, height),
+                )
+                context.stroke()
+
+        def _draw_fill(self, context, points, width, height):
+            if len(points) < 2:
+                return
+            for left, right in zip(points, points[1:]):
+                red, green, blue = _rgb_for_level((left.level + right.level) / 2.0)
+                context.set_source_rgba(red, green, blue, 0.15)
+                context.move_to(self._x_for_offset(left.minute_offset, width), height)
+                context.line_to(
+                    self._x_for_offset(left.minute_offset, width),
+                    self._y_for_level(left.level, height),
+                )
+                context.line_to(
+                    self._x_for_offset(right.minute_offset, width),
+                    self._y_for_level(right.level, height),
+                )
+                context.line_to(self._x_for_offset(right.minute_offset, width), height)
+                context.close_path()
+                context.fill()
+
     return EnergyCurveEditor()
+
+
+def _rgb_for_level(level: float):
+    value = _sanitize_level(level)
+    if value <= 3.0:
+        return (0.8863, 0.2941, 0.2902)
+    if value <= 6.0:
+        return (0.9373, 0.6235, 0.1529)
+    return (0.1137, 0.6196, 0.4588)

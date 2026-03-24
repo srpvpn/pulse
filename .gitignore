@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 pulse.db
 pulse-settings.json
+AGENTS.md
+design-*.html
+react-app*.js

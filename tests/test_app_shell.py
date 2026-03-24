@@ -7,6 +7,8 @@ def test_first_launch_routes_to_onboarding(tmp_path):
 
     assert state.current_view == "onboarding"
     assert state.reminder_time == "20:00"
+    assert state.language == "en"
+    assert state.theme_mode == "system"
 
 
 def test_completing_onboarding_routes_to_evening(tmp_path):
@@ -65,6 +67,55 @@ def test_non_boolean_onboarding_complete_falls_back_to_onboarding(tmp_path):
     assert state.reminder_time == "21:30"
 
 
+def test_application_persists_language_selection(tmp_path):
+    from pulse.main import PulseApplication
+
+    app = PulseApplication(data_dir=tmp_path)
+
+    state = app.set_language("ru")
+
+    assert state.language == "ru"
+    assert app.build_state().language == "ru"
+
+
+def test_application_persists_theme_mode_selection(tmp_path):
+    from pulse.main import PulseApplication
+
+    app = PulseApplication(data_dir=tmp_path)
+
+    state = app.set_theme_mode("dark")
+
+    assert state.theme_mode == "dark"
+    assert app.build_state().theme_mode == "dark"
+
+
+def test_invalid_theme_mode_falls_back_to_system(tmp_path):
+    from json import dumps
+
+    from pulse.main import PulseApplication
+
+    settings_path = tmp_path / "pulse-settings.json"
+    settings_path.write_text(
+        dumps(
+            {
+                "onboarding_complete": True,
+                "reminder_time": "21:30",
+                "language": "ru",
+                "theme_mode": "sepia",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    app = PulseApplication(data_dir=tmp_path)
+    state = app.build_state()
+
+    assert state.current_view == "evening"
+    assert state.reminder_time == "21:30"
+    assert state.language == "ru"
+    assert state.theme_mode == "system"
+
+
 def test_main_window_uses_initial_state_for_routing():
     from pulse.main import AppShellState
     from pulse.ui.main_window import PulseMainWindow
@@ -74,3 +125,64 @@ def test_main_window_uses_initial_state_for_routing():
     window = PulseMainWindow(application=None, initial_state=state)
 
     assert window.current_view == "evening"
+
+
+def test_main_window_keeps_application_reference():
+    from pulse.main import AppShellState
+    from pulse.ui.main_window import PulseMainWindow
+
+    application = object()
+    window = PulseMainWindow(application=application, initial_state=AppShellState("onboarding", "20:00"))
+
+    assert window.application is application
+    assert window.uses_compact_stack_sizing is True
+
+
+def test_main_window_dashboard_path_handles_saved_weekly_checkin_without_crashing(tmp_path):
+    from pulse.main import AppShellState, PulseApplication
+    from pulse.ui.evening_input import HourlyEnergySample
+    from pulse.ui.main_window import PulseMainWindow
+
+    app = PulseApplication(data_dir=tmp_path)
+    app.complete_onboarding("20:00")
+    app.database.save_evening_input(
+        date="2026-03-23",
+        hourly_samples=[HourlyEnergySample(hour=8, level=5.0), HourlyEnergySample(hour=9, level=6.0)],
+        sleep_hours=7.0,
+        stress_level="low",
+    )
+    app.database.save_weekly_checkin(
+        week="2026-03-23",
+        exhaustion=2,
+        cynicism=1,
+        efficacy=3,
+        note="Keep Friday lighter",
+    )
+
+    window = PulseMainWindow(
+        application=app,
+        initial_state=AppShellState(current_view="dashboard", reminder_time="20:00"),
+    )
+
+    assert window.current_view == "dashboard"
+
+
+def test_latest_mbi_correction_uses_saved_checkin_directly(tmp_path):
+    from pulse.main import AppShellState, PulseApplication
+    from pulse.ui.main_window import PulseMainWindow
+
+    app = PulseApplication(data_dir=tmp_path)
+    app.database.save_weekly_checkin(
+        week="2026-03-23",
+        exhaustion=4,
+        cynicism=4,
+        efficacy=0,
+        note="Hard week",
+    )
+
+    window = PulseMainWindow(
+        application=app,
+        initial_state=AppShellState(current_view="dashboard", reminder_time="20:00"),
+    )
+
+    assert window._latest_mbi_correction() == -10.0

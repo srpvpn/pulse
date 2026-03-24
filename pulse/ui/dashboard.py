@@ -1,10 +1,12 @@
 """Dashboard helpers for Pulse."""
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
 
 from pulse.advice_engine import AdviceRecommendation
 from pulse.burnout_engine import BurnoutScoreResult
+from pulse.i18n import tr
+from pulse.ui.theme import apply_classes, build_responsive_page
 from pulse.ui.widgets import create_score_ring_widget
 
 
@@ -25,6 +27,25 @@ class DashboardViewModel:
     primary_action: str
     primary_science_ref: str
     ultradian_cycles: int
+    score_label: str
+    zone_pill: str
+    secondary_metrics: List[object]
+    headline: str
+    score_card_title: str
+    insight_title: str
+    reference_cards: List[object]
+
+
+@dataclass(frozen=True)
+class DashboardMetric:
+    label: str
+    value: str
+
+
+@dataclass(frozen=True)
+class DashboardReferenceCard:
+    label: str
+    items: List[str]
 
 
 RED_ZONE = DashboardScoreZone("red", "Critical", "#E24B4A", 0, 39)
@@ -44,9 +65,10 @@ def build_dashboard_view_model(
     burnout: BurnoutScoreResult,
     advice: Optional[AdviceRecommendation],
     ultradian_cycles: int = 0,
+    language: str = "en",
 ) -> DashboardViewModel:
     score_zone = score_zone_for(burnout.score)
-    primary_message, primary_action, primary_science_ref = _primary_advice(score_zone, advice)
+    primary_message, primary_action, primary_science_ref = _primary_advice(score_zone, advice, language)
     return DashboardViewModel(
         score=burnout.score,
         score_zone=score_zone,
@@ -54,33 +76,62 @@ def build_dashboard_view_model(
         primary_action=primary_action,
         primary_science_ref=primary_science_ref,
         ultradian_cycles=ultradian_cycles,
+        score_label="{:.0f}".format(burnout.score),
+        zone_pill=tr(language, "dashboard.zone_pill", zone=score_zone.label),
+        secondary_metrics=[
+            DashboardMetric(label=tr(language, "dashboard.metric.rqs"), value="{:.0f}".format(burnout.rqs)),
+            DashboardMetric(label=tr(language, "dashboard.metric.ali"), value="{:.1f}".format(burnout.ali)),
+            DashboardMetric(label=tr(language, "dashboard.metric.cycles"), value="{:d}".format(ultradian_cycles)),
+        ],
+        headline=tr(language, "dashboard.headline"),
+        score_card_title=tr(language, "dashboard.score_title"),
+        insight_title=tr(language, "dashboard.insight_title"),
+        reference_cards=[
+            DashboardReferenceCard(
+                label=tr(language, "dashboard.recovery_direction"),
+                items=[_recovery_direction(score_zone, language)],
+            ),
+            DashboardReferenceCard(
+                label=tr(language, "dashboard.cycles"),
+                items=[tr(language, "dashboard.cycles_completed", count=ultradian_cycles)],
+            ),
+        ],
     )
 
 
 def _primary_advice(
     score_zone: DashboardScoreZone,
     advice: Optional[AdviceRecommendation],
+    language: str,
 ) -> tuple:
     if advice is not None:
         return advice.message, advice.action, advice.science_ref
 
     if score_zone.key == "red":
         return (
-            "Your score is in the critical zone. Stop adding load today.",
-            "Close work apps now",
-            "Allostatic Load (McEwen, 1998)",
+            tr(language, "dashboard.advice.red.message"),
+            tr(language, "dashboard.advice.red.action"),
+            tr(language, "dashboard.advice.red.ref"),
         )
     if score_zone.key == "yellow":
         return (
-            "Your score is in the attention zone. Protect the next block of work.",
-            "Keep the afternoon meeting-free",
-            "Burnout trajectory monitoring",
+            tr(language, "dashboard.advice.yellow.message"),
+            tr(language, "dashboard.advice.yellow.action"),
+            tr(language, "dashboard.advice.yellow.ref"),
         )
     return (
-        "Your score is in the healthy zone. Keep the load stable.",
-        "Continue with the current plan",
-        "Recovery and pacing",
+        tr(language, "dashboard.advice.green.message"),
+        tr(language, "dashboard.advice.green.action"),
+        tr(language, "dashboard.advice.green.ref"),
     )
+
+
+def _recovery_direction(score_zone: DashboardScoreZone, language: str) -> str:
+    if score_zone.key == "green":
+        return tr(language, "dashboard.load_stable")
+    if score_zone.key == "yellow":
+        return tr(language, "dashboard.protect_block")
+    return tr(language, "dashboard.recovery_urgent")
 
 
 def _load_ui():
@@ -103,34 +154,37 @@ def create_dashboard_page(view_model: DashboardViewModel, has_data: bool = True)
         return None
 
     content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
-    content.set_margin_top(24)
-    content.set_margin_bottom(24)
-    content.set_margin_start(24)
-    content.set_margin_end(24)
 
-    hero = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=24)
-    hero.add_css_class("card")
-    hero.set_margin_start(12)
-    hero.set_margin_end(12)
-    hero.set_margin_top(6)
-    hero.set_margin_bottom(6)
+    header = Gtk.Label(label=view_model.headline, xalign=0.0)
+    apply_classes(header, "pulse-hero-title")
+    content.append(header)
 
     ring = create_score_ring_widget(view_model.score, view_model.score_zone.color)
     if hasattr(ring, "set_content_width"):
-        ring.set_content_width(180)
-        ring.set_content_height(180)
+        ring.set_content_width(160)
+        ring.set_content_height(160)
     elif hasattr(ring, "set_size_request"):
-        ring.set_size_request(180, 180)
-    hero.append(ring)
+        ring.set_size_request(160, 160)
+
+    hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+    apply_classes(hero, "pulse-card-glass")
+    hero.set_hexpand(True)
+    hero_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+    hero_title = Gtk.Label(label=view_model.score_card_title, xalign=0.0)
+    apply_classes(hero_title, "pulse-subtle")
+    hero_title.set_hexpand(True)
+    zone_label = Gtk.Label(label=view_model.zone_pill, xalign=1.0)
+    apply_classes(zone_label, "pulse-chip")
+    hero_header.append(hero_title)
+    hero_header.append(zone_label)
+    hero.append(hero_header)
+
+    hero_body = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=24)
+    hero_body.append(ring)
 
     summary = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-    score_label = Gtk.Label(label="{:.0f}".format(view_model.score), xalign=0.0)
-    score_label.add_css_class("title-1")
-    zone_label = Gtk.Label(
-        label="Burnout Score · {}".format(view_model.score_zone.label),
-        xalign=0.0,
-    )
-    zone_label.add_css_class("heading")
+    score_label = Gtk.Label(label=view_model.score_label, xalign=0.0)
+    apply_classes(score_label, "pulse-hero-title")
     status_label = Gtk.Label(
         label=(
             "Pulse is building your baseline from fresh data."
@@ -140,35 +194,49 @@ def create_dashboard_page(view_model: DashboardViewModel, has_data: bool = True)
         wrap=True,
         xalign=0.0,
     )
-    status_label.add_css_class("dim-label")
-    action_label = Gtk.Label(label=view_model.primary_action, wrap=True, xalign=0.0)
-    science_label = Gtk.Label(label=view_model.primary_science_ref, wrap=True, xalign=0.0)
-    science_label.add_css_class("caption")
+    apply_classes(status_label, "pulse-subtle")
     summary.append(score_label)
-    summary.append(zone_label)
     summary.append(status_label)
-    summary.append(action_label)
-    summary.append(science_label)
-    hero.append(summary)
+    hero_body.append(summary)
+    hero.append(hero_body)
     content.append(hero)
 
-    stats_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-    stats_card.add_css_class("card")
-    stats_card.set_margin_start(12)
-    stats_card.set_margin_end(12)
-    stats_card.set_margin_top(6)
-    stats_card.set_margin_bottom(6)
-    stats_title = Gtk.Label(label="Today", xalign=0.0)
-    stats_title.add_css_class("heading")
-    cycles_label = Gtk.Label(
-        label="Estimated ultradian cycles: {:d}".format(view_model.ultradian_cycles),
-        xalign=0.0,
-    )
-    stats_card.append(stats_title)
-    stats_card.append(cycles_label)
-    content.append(stats_card)
+    insight = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    apply_classes(insight, "pulse-card-soft")
+    insight_title = Gtk.Label(label=view_model.insight_title, xalign=0.0)
+    apply_classes(insight_title, "pulse-subtle")
+    insight_body = Gtk.Label(label=view_model.primary_message, wrap=True, xalign=0.0)
+    apply_classes(insight_body, "pulse-brand")
+    insight.append(insight_title)
+    insight.append(insight_body)
+    content.append(insight)
 
-    scroller = Gtk.ScrolledWindow()
-    scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-    scroller.set_child(content)
-    return scroller
+    stats_row = Gtk.FlowBox()
+    stats_row.set_selection_mode(Gtk.SelectionMode.NONE)
+    stats_row.set_max_children_per_line(2)
+    stats_row.set_min_children_per_line(1)
+    stats_row.set_column_spacing(16)
+    stats_row.set_row_spacing(16)
+
+    trend_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    apply_classes(trend_card, "pulse-card")
+    trend_title = Gtk.Label(label=view_model.reference_cards[0].label, xalign=0.0)
+    apply_classes(trend_title, "pulse-subtle")
+    trend_card.append(trend_title)
+    trend_value = Gtk.Label(label=view_model.reference_cards[0].items[0], xalign=0.0, wrap=True)
+    apply_classes(trend_value, "heading")
+    trend_card.append(trend_value)
+    stats_row.insert(trend_card, -1)
+
+    cycles_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    apply_classes(cycles_card, "pulse-card")
+    cycles_title = Gtk.Label(label=view_model.reference_cards[1].label, xalign=0.0)
+    apply_classes(cycles_title, "pulse-subtle")
+    cycles_card.append(cycles_title)
+    cycles_value = Gtk.Label(label=view_model.reference_cards[1].items[0], xalign=0.0, wrap=True)
+    apply_classes(cycles_value, "heading")
+    cycles_card.append(cycles_value)
+    stats_row.insert(cycles_card, -1)
+    content.append(stats_row)
+
+    return build_responsive_page(content, "dashboard")

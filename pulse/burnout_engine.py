@@ -11,6 +11,7 @@ class BurnoutEntry:
     average_energy: float
     sleep_hours: Optional[float] = None
     stress_level: Optional[str] = None
+    physical_activity: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -74,7 +75,8 @@ def compute_recovery_quality_score(entries: Sequence[BurnoutEntry]) -> float:
         else:
             stress_history.append(stress_value)
 
-        daily_scores.append((_sleep_score(sleep_hours) * 0.6) + (stress_value * 0.4))
+        activity_bonus = _activity_bonus(entry.physical_activity)
+        daily_scores.append((_sleep_score(sleep_hours) * 0.8) + (stress_value * 0.2) + activity_bonus)
 
     return _clamp(mean(daily_scores), 0.0, 100.0)
 
@@ -142,6 +144,17 @@ def _stress_score(level: Optional[str]) -> Optional[float]:
     if normalized == "high":
         return 20.0
     return 60.0
+
+
+def _activity_bonus(activity: Optional[str]) -> float:
+    if activity is None:
+        return 0.0
+    normalized = activity.strip().lower()
+    if normalized == "yes":
+        return 5.0
+    if normalized == "some":
+        return 3.0
+    return 0.0
 
 
 def _fallback_mean(values: Iterable[float], default: float) -> float:

@@ -37,6 +37,25 @@ def test_sample_energy_curve_only_produces_levels_within_domain():
     assert all(1.0 <= sample.level <= 10.0 for sample in samples)
 
 
+def test_catmull_rom_points_returns_smooth_clamped_curve():
+    from pulse.ui.evening_input import CurvePoint, catmull_rom_points
+
+    curve = [
+        CurvePoint(minute_offset=0, level=2.0),
+        CurvePoint(minute_offset=120, level=9.0),
+        CurvePoint(minute_offset=300, level=0.0),
+        CurvePoint(minute_offset=540, level=12.0),
+    ]
+
+    smoothed = catmull_rom_points(curve, num_segments=8)
+
+    assert smoothed[0] == CurvePoint(minute_offset=0, level=2.0)
+    assert smoothed[-1] == CurvePoint(minute_offset=540, level=10.0)
+    assert len(smoothed) > len(curve)
+    assert all(1.0 <= point.level <= 10.0 for point in smoothed)
+    assert any(0 < point.minute_offset < 120 for point in smoothed[1:-1])
+
+
 def test_save_evening_input_persists_hourly_logs_and_context(tmp_path):
     from pulse.db import Database
     from pulse.ui.evening_input import HourlyEnergySample

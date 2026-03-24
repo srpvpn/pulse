@@ -89,3 +89,35 @@ def test_compute_burnout_score_clips_and_uses_fallback_context_on_decline():
     assert result.rqs == 100.0
     assert result.trend_penalty == 660.0
     assert result.score == 0.0
+
+
+def test_compute_recovery_quality_score_gives_sleep_more_weight_than_stress():
+    from pytest import approx
+    from pulse.burnout_engine import BurnoutEntry, compute_recovery_quality_score
+
+    entries = [
+        BurnoutEntry(date="2026-03-01", average_energy=7.0, sleep_hours=5.0, stress_level="low"),
+        BurnoutEntry(date="2026-03-02", average_energy=7.0, sleep_hours=8.0, stress_level="high"),
+    ]
+
+    result = compute_recovery_quality_score(entries)
+
+    assert result == approx(65.3, abs=0.1)
+
+
+def test_compute_recovery_quality_score_adds_activity_bonus():
+    from pulse.burnout_engine import BurnoutEntry, compute_recovery_quality_score
+
+    no_activity = [
+        BurnoutEntry(date="2026-03-01", average_energy=7.0, sleep_hours=7.0, stress_level="medium", physical_activity="none"),
+    ]
+    some_activity = [
+        BurnoutEntry(date="2026-03-01", average_energy=7.0, sleep_hours=7.0, stress_level="medium", physical_activity="some"),
+    ]
+    yes_activity = [
+        BurnoutEntry(date="2026-03-01", average_energy=7.0, sleep_hours=7.0, stress_level="medium", physical_activity="yes"),
+    ]
+
+    assert compute_recovery_quality_score(no_activity) == 92.0
+    assert compute_recovery_quality_score(some_activity) == 95.0
+    assert compute_recovery_quality_score(yes_activity) == 97.0

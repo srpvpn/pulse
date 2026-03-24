@@ -58,6 +58,23 @@ def test_build_dashboard_view_model_uses_fallback_primary_message_when_advice_mi
     assert view_model.primary_science_ref == "Burnout trajectory monitoring"
 
 
+def test_build_dashboard_view_model_uses_honest_metric_labels():
+    from pulse.burnout_engine import BurnoutScoreResult
+    from pulse.ui.dashboard import build_dashboard_view_model
+
+    view_model = build_dashboard_view_model(
+        BurnoutScoreResult(score=55.0, ali=4.0, rqs=68.0, trend_penalty=0.0, mbi_correction=0.0),
+        None,
+        ultradian_cycles=1,
+    )
+
+    assert [metric.label for metric in view_model.secondary_metrics] == [
+        "Recovery quality",
+        "Accumulated fatigue",
+        "Ultradian cycles",
+    ]
+
+
 def test_score_ring_widget_fallback_tracks_score_and_zone_color():
     from pulse.ui.widgets import create_score_ring_widget
 

@@ -1,27 +1,36 @@
 """Application entry point for Pulse."""
 
 import json
+import sys
 from datetime import date as date_class
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence
 
 from pulse.db import Database
+from pulse.dev_seed import seed_demo_data
+from pulse.i18n import normalize_language
 from pulse.ui.main_window import PulseMainWindow
 from pulse.ui.onboarding import normalize_reminder_time
 from pulse.ui.rituals import Ritual, due_rituals_for_time, to_rituals
+from pulse.ui.theme import normalize_theme_mode
+from pulse.ui.weekly_review import MBICheckin
 
 
 @dataclass(frozen=True)
 class PulseSettings:
     onboarding_complete: bool = False
     reminder_time: str = "20:00"
+    language: str = "en"
+    theme_mode: str = "system"
 
 
 @dataclass(frozen=True)
 class AppShellState:
     current_view: str
     reminder_time: str
+    language: str = "en"
+    theme_mode: str = "system"
 
 
 def _load_gtk():
@@ -98,6 +107,8 @@ class PulseApplication(ApplicationBase):
         return PulseSettings(
             onboarding_complete=onboarding_complete,
             reminder_time=normalize_reminder_time(payload.get("reminder_time", "20:00")),
+            language=normalize_language(payload.get("language", "en")),
+            theme_mode=normalize_theme_mode(payload.get("theme_mode", "system")),
         )
 
     def save_settings(self, settings: PulseSettings) -> None:
@@ -107,6 +118,8 @@ class PulseApplication(ApplicationBase):
                 {
                     "onboarding_complete": settings.onboarding_complete,
                     "reminder_time": settings.reminder_time,
+                    "language": settings.language,
+                    "theme_mode": settings.theme_mode,
                 },
                 handle,
             )
@@ -114,18 +127,52 @@ class PulseApplication(ApplicationBase):
     def build_state(self) -> AppShellState:
         settings = self.load_settings()
         current_view = "evening" if settings.onboarding_complete else "onboarding"
-        return AppShellState(current_view=current_view, reminder_time=settings.reminder_time)
+        return AppShellState(
+            current_view=current_view,
+            reminder_time=settings.reminder_time,
+            language=settings.language,
+            theme_mode=settings.theme_mode,
+        )
 
     def complete_onboarding(self, reminder_time: str) -> AppShellState:
         settings = PulseSettings(
             onboarding_complete=True,
             reminder_time=normalize_reminder_time(reminder_time),
+            language=self.load_settings().language,
+            theme_mode=self.load_settings().theme_mode,
         )
         self.save_settings(settings)
         return self.build_state()
 
+    def set_language(self, language: str) -> AppShellState:
+        current = self.load_settings()
+        self.save_settings(
+            PulseSettings(
+                onboarding_complete=current.onboarding_complete,
+                reminder_time=current.reminder_time,
+                language=normalize_language(language),
+                theme_mode=current.theme_mode,
+            )
+        )
+        return self.build_state()
+
+    def set_theme_mode(self, theme_mode: str) -> AppShellState:
+        current = self.load_settings()
+        self.save_settings(
+            PulseSettings(
+                onboarding_complete=current.onboarding_complete,
+                reminder_time=current.reminder_time,
+                language=current.language,
+                theme_mode=normalize_theme_mode(theme_mode),
+            )
+        )
+        return self.build_state()
+
     def load_rituals(self) -> List[Ritual]:
         return to_rituals(self.database.list_active_rituals())
+
+    def load_all_rituals(self) -> List[Ritual]:
+        return to_rituals(self.database.list_rituals())
 
     def plan_notifications(
         self,
@@ -177,7 +224,10 @@ def build_application(data_dir: Optional[Path] = None) -> PulseApplication:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    arguments = list(argv if argv is not None else sys.argv)
     application = build_application()
+    if "--seed-demo" in arguments:
+        seed_demo_data(application.database)
     return application.run(argv)
 
 
