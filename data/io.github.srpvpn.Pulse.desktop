@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Pulse
+Comment=Track energy patterns and burnout signals locally
+Exec=pulse
+Icon=io.github.srpvpn.Pulse
+Terminal=false
+Categories=GTK;GNOME;Office;Utility;
+StartupNotify=true
+StartupWMClass=Pulse
+Keywords=burnout;energy;health;tracker;wellbeing;gnome;

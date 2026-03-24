@@ -2,6 +2,8 @@
 
 Pulse is a local-first burnout and energy tracker for GNOME. It is built in Python with GTK4 and Libadwaita, and it stores all data locally in SQLite.
 
+The canonical desktop application ID is `io.github.srpvpn.Pulse`.
+
 ## Run
 
 For this stage, run the app directly from the checkout:
@@ -26,8 +28,24 @@ Use module form for pytest in this environment:
 python3 -m pytest tests -v
 ```
 
+## Packaging
+
+Circle and Flathub-facing assets live under `data/` and `build-aux/flatpak/`.
+
+- `data/io.github.srpvpn.Pulse.desktop` is the installable desktop file.
+- `data/io.github.srpvpn.Pulse.metainfo.xml` is the AppStream metadata.
+- `data/icons/hicolor/scalable/apps/io.github.srpvpn.Pulse.svg` is the current app icon.
+- `build-aux/flatpak/io.github.srpvpn.Pulse.json` is the Flatpak manifest scaffold using `org.gnome.Platform` and `org.gnome.Sdk`.
+- `assets/screenshots/` stores repository-tracked screenshots referenced by AppStream metadata.
+
+When `appstreamcli` is available locally, validate metadata with:
+
+```bash
+appstreamcli validate --strict data/io.github.srpvpn.Pulse.metainfo.xml
+```
+
 ## Notes
 
-- The current desktop entry is for development use from this repository checkout.
-- There is no packaged Flatpak or `.deb` in this repository yet.
+- `pulse/pulse.desktop` remains a checkout-friendly desktop file for development runs.
+- The Flatpak manifest is a repository scaffold and still needs real build validation in a GNOME SDK environment.
 - Use `--seed-demo` when validating dashboard, patterns, weekly review, and rituals flows on a fresh checkout.

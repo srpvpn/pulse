@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.srpvpn.Pulse</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Pulse</name>
+  <summary>Local-first burnout and energy tracking for GNOME</summary>
+  <description>
+    <p>
+      Pulse helps you log energy levels, spot recovery patterns, review weekly burnout signals,
+      and keep lightweight rituals on a private local database.
+    </p>
+    <p>
+      The app is built for GNOME with GTK 4 and Libadwaita and is designed to stay responsive on
+      narrow and wide window sizes.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.srpvpn.Pulse.desktop</launchable>
+  <developer id="io.github.srpvpn">
+    <name>srpvpn</name>
+  </developer>
+  <url type="homepage">https://github.com/srpvpn/pulse</url>
+  <url type="bugtracker">https://github.com/srpvpn/pulse/issues</url>
+  <url type="vcs-browser">https://github.com/srpvpn/pulse</url>
+  <content_rating type="oars-1.1" />
+  <branding>
+    <color type="primary" scheme_preference="light">#2F5C45</color>
+    <color type="primary" scheme_preference="dark">#7DD3A7</color>
+  </branding>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Dashboard overview in the dark style</caption>
+      <image>https://raw.githubusercontent.com/srpvpn/pulse/main/assets/screenshots/burnout-dashboard-dark.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Dashboard overview in the light style</caption>
+      <image>https://raw.githubusercontent.com/srpvpn/pulse/main/assets/screenshots/burnout-dashboard-light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Patterns view with rhythm heatmap in the light style</caption>
+      <image>https://raw.githubusercontent.com/srpvpn/pulse/main/assets/screenshots/energy-patterns-light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Patterns view with rhythm heatmap in the dark style</caption>
+      <image>https://raw.githubusercontent.com/srpvpn/pulse/main/assets/screenshots/energy-patterns-dark.png</image>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="0.1.0" date="2026-03-24" />
+  </releases>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+</component>

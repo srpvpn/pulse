@@ -1,0 +1,33 @@
+{
+  "app-id": "io.github.srpvpn.Pulse",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "48",
+  "sdk": "org.gnome.Sdk",
+  "command": "pulse",
+  "finish-args": [
+    "--share=ipc",
+    "--socket=fallback-x11",
+    "--socket=wayland",
+    "--device=dri"
+  ],
+  "modules": [
+    {
+      "name": "pulse",
+      "buildsystem": "simple",
+      "build-commands": [
+        "install -Dm755 build-aux/flatpak/pulse.sh /app/bin/pulse",
+        "mkdir -p /app/lib/python3.12/site-packages",
+        "cp -r pulse /app/lib/python3.12/site-packages/pulse",
+        "install -Dm644 data/io.github.srpvpn.Pulse.desktop /app/share/applications/io.github.srpvpn.Pulse.desktop",
+        "install -Dm644 data/io.github.srpvpn.Pulse.metainfo.xml /app/share/metainfo/io.github.srpvpn.Pulse.metainfo.xml",
+        "install -Dm644 data/icons/hicolor/scalable/apps/io.github.srpvpn.Pulse.svg /app/share/icons/hicolor/scalable/apps/io.github.srpvpn.Pulse.svg"
+      ],
+      "sources": [
+        {
+          "type": "dir",
+          "path": "."
+        }
+      ]
+    }
+  ]
+}

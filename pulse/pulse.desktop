@@ -3,6 +3,6 @@ Type=Application
 Name=Pulse
 Comment=Personal burnout and energy monitor
 Exec=python3 -m pulse.main
-Icon=com.example.Pulse
+Icon=io.github.srpvpn.Pulse
 Terminal=false
 Categories=Utility;
