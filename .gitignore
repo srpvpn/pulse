@@ -5,5 +5,6 @@ __pycache__/
 pulse.db
 pulse-settings.json
 AGENTS.md
+docs/
 design-*.html
 react-app*.js
