@@ -3,7 +3,7 @@ import json
 import xml.etree.ElementTree as ET
 
 
-APP_ID = "io.github.srpvpn.Pulse"
+APP_ID = "io.github.srpvpn.pulse"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -30,6 +30,7 @@ def test_packaging_desktop_file_exists_and_uses_canonical_id():
     content = desktop_path.read_text(encoding="utf-8")
     assert "Icon={}\n".format(APP_ID) in content
     assert "StartupWMClass=Pulse\n" in content
+    assert "Categories=GTK;GNOME;Utility;\n" in content
 
 
 def test_metainfo_contains_circle_relevant_core_fields():

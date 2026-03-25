@@ -25,13 +25,13 @@ python3 -m pytest tests -v
 Build the Flatpak locally:
 
 ```bash
-flatpak-builder --user --install --force-clean --disable-rofiles-fuse --repo=repo builddir io.github.srpvpn.Pulse.json
+flatpak-builder --user --install --force-clean --disable-rofiles-fuse --repo=repo builddir io.github.srpvpn.pulse.json
 ```
 
 Run the installed Flatpak:
 
 ```bash
-flatpak run io.github.srpvpn.Pulse
+flatpak run io.github.srpvpn.pulse
 ```
 
 ## Code Style

@@ -107,7 +107,7 @@ else:
 class PulseApplication(ApplicationBase):
     """GTK application shell for Pulse."""
 
-    def __init__(self, application_id: str = "io.github.srpvpn.Pulse", data_dir: Optional[Path] = None) -> None:
+    def __init__(self, application_id: str = "io.github.srpvpn.pulse", data_dir: Optional[Path] = None) -> None:
         super(PulseApplication, self).__init__(application_id=application_id)
         self.application_id = application_id
         self.data_dir = Path(data_dir) if data_dir is not None else _default_data_dir(application_id)

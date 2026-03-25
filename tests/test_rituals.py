@@ -150,7 +150,7 @@ def test_notify_due_rituals_falls_back_to_notify_send_when_gio_unavailable(tmp_p
                 "-a",
                 "Pulse",
                 "-i",
-                "io.github.srpvpn.Pulse",
+                "io.github.srpvpn.pulse",
                 "Walk outside",
                 "Scheduled for 15:48",
             ],
