@@ -88,6 +88,11 @@ def test_flatpak_manifest_targets_gnome_runtime():
     assert manifest["runtime-version"] == "49"
     assert manifest["sdk"] == "org.gnome.Sdk"
     assert manifest["command"] == "pulse"
+    build_commands = manifest["modules"][0]["build-commands"]
+    assert any(
+        "$FLATPAK_DEST/share/licenses/$FLATPAK_ID" in command or "/app/share/licenses/io.github.srpvpn.pulse" in command
+        for command in build_commands
+    )
     source = manifest["modules"][0]["sources"][0]
     assert source["type"] == "archive"
     assert source["url"] == "https://github.com/srpvpn/pulse/archive/refs/tags/0.1.0.tar.gz"
