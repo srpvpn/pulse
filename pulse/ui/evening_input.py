@@ -24,6 +24,14 @@ class HourlyEnergySample:
     level: float
 
 
+DEFAULT_CURVE_POINTS = (
+    CurvePoint(0, 6.0),
+    CurvePoint(240, 7.5),
+    CurvePoint(540, 4.5),
+    CurvePoint(900, 5.0),
+)
+
+
 @dataclass(frozen=True)
 class EveningPageModel:
     title: str
@@ -35,6 +43,7 @@ class EveningPageModel:
     sticky_primary_action: bool
     fills_viewport: bool
     large_primary_action: bool
+    keyboard_editor_hidden_by_default: bool
     max_content_width: int
     responsive_layout: bool
     scroll_policy: str
@@ -61,6 +70,7 @@ def build_evening_page_model(language: str = "en") -> EveningPageModel:
         sticky_primary_action=False,
         fills_viewport=True,
         large_primary_action=True,
+        keyboard_editor_hidden_by_default=True,
         max_content_width=960,
         responsive_layout=True,
         scroll_policy="automatic",
@@ -89,6 +99,23 @@ def sample_energy_curve(
         level = _sample_level_at(points, minute_offset)
         hourly_samples.append(HourlyEnergySample(hour=hour, level=level))
     return hourly_samples
+
+
+def build_default_hourly_samples() -> List[HourlyEnergySample]:
+    return sample_energy_curve(DEFAULT_CURVE_POINTS)
+
+
+def hourly_samples_to_curve_points(
+    hourly_samples: Sequence[HourlyEnergySample],
+    start_hour: int = DAY_START_HOUR,
+    end_hour: int = DAY_END_HOUR,
+) -> List[CurvePoint]:
+    points = []
+    for sample in hourly_samples:
+        hour = max(start_hour, min(end_hour, int(sample.hour)))
+        minute_offset = (hour - start_hour) * 60
+        points.append(CurvePoint(minute_offset=minute_offset, level=sample.level))
+    return _sort_points(points)
 
 
 def catmull_rom_points(
@@ -217,6 +244,62 @@ def create_evening_page(
     content.append(subtitle)
 
     editor = _create_curve_editor()
+    sync_state = {"active": False}
+
+    def sync_hourly_from_curve(points):
+        if sync_state["active"]:
+            return
+        sync_state["active"] = True
+        try:
+            hourly_editor["set_samples"](sample_energy_curve(points))
+        finally:
+            sync_state["active"] = False
+
+    def sync_curve_from_hourly(samples):
+        if sync_state["active"]:
+            return
+        sync_state["active"] = True
+        try:
+            editor.set_points(hourly_samples_to_curve_points(samples))
+        finally:
+            sync_state["active"] = False
+
+    hourly_editor = _build_hourly_level_editor(
+        build_default_hourly_samples(),
+        language=language,
+        on_change=sync_curve_from_hourly,
+    )
+    editor.on_curve_changed = sync_hourly_from_curve
+    keyboard_toggle = Gtk.Button(label=tr(language, "evening.keyboard_show"))
+    apply_classes(keyboard_toggle, "pulse-nav-item")
+    keyboard_toggle.set_halign(Gtk.Align.START)
+    if hasattr(keyboard_toggle, "set_tooltip_text"):
+        keyboard_toggle.set_tooltip_text(tr(language, "evening.keyboard_show"))
+
+    keyboard_revealer = Gtk.Revealer()
+    if hasattr(keyboard_revealer, "set_transition_type"):
+        keyboard_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_DOWN)
+    if hasattr(keyboard_revealer, "set_transition_duration"):
+        keyboard_revealer.set_transition_duration(180)
+    keyboard_revealer.set_reveal_child(not page.keyboard_editor_hidden_by_default)
+    keyboard_revealer.set_child(hourly_editor["container"])
+
+    def update_keyboard_toggle_label():
+        if keyboard_revealer.get_reveal_child():
+            label = tr(language, "evening.keyboard_hide")
+        else:
+            label = tr(language, "evening.keyboard_show")
+        keyboard_toggle.set_label(label)
+        if hasattr(keyboard_toggle, "set_tooltip_text"):
+            keyboard_toggle.set_tooltip_text(label)
+
+    def handle_keyboard_toggle(_button):
+        keyboard_revealer.set_reveal_child(not keyboard_revealer.get_reveal_child())
+        update_keyboard_toggle_label()
+
+    keyboard_toggle.connect("clicked", handle_keyboard_toggle)
+    update_keyboard_toggle_label()
+
     editor_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
     apply_classes(editor_card, "pulse-card-glass")
     editor_card.set_hexpand(True)
@@ -231,6 +314,8 @@ def create_evening_page(
     editor_card.append(chart_title)
     editor_card.append(chart_hint)
     editor_card.append(editor)
+    editor_card.append(keyboard_toggle)
+    editor_card.append(keyboard_revealer)
     content.append(editor_card)
 
     sleep_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -285,6 +370,8 @@ def create_evening_page(
 
     def handle_save(_button):
         samples = sample_energy_curve(editor.points)
+        if hourly_editor is not None:
+            samples = hourly_editor["get_samples"]()
         context = {
             "sleep_hours": round(sleep_scale.get_value(), 1),
             "physical_activity": activity_selector["get_value"]().lower(),
@@ -344,17 +431,82 @@ def _build_choice_selector(title: str, options: Sequence[str], selected: str):
     return {"container": container, "get_value": get_value}
 
 
+def _build_hourly_level_editor(
+    initial_samples: Sequence[HourlyEnergySample],
+    language: str = "en",
+    on_change=None,
+):
+    container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+
+    title = Gtk.Label(label=tr(language, "evening.keyboard_title"), xalign=0.0)
+    apply_classes(title, "heading")
+    hint = Gtk.Label(
+        label=tr(language, "evening.keyboard_hint"),
+        wrap=True,
+        xalign=0.0,
+    )
+    apply_classes(hint, "pulse-subtle")
+    container.append(title)
+    container.append(hint)
+
+    grid = Gtk.Grid()
+    grid.set_column_spacing(12)
+    grid.set_row_spacing(12)
+
+    spins = {}
+    samples = _normalize_hourly_samples(initial_samples)
+
+    for index, sample in enumerate(samples):
+        cell = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        hour_label = Gtk.Label(label="{:02d}:00".format(sample.hour), xalign=0.0)
+        apply_classes(hour_label, "pulse-subtle")
+
+        spin = Gtk.SpinButton.new_with_range(1.0, 10.0, 0.5)
+        spin.set_digits(1)
+        spin.set_numeric(True)
+        spin.set_value(sample.level)
+        if hasattr(spin, "set_tooltip_text"):
+            spin.set_tooltip_text("{:02d}:00".format(sample.hour))
+        if on_change is not None:
+            spin.connect("value-changed", lambda _spin: on_change(get_samples()))
+        spins[sample.hour] = spin
+
+        cell.append(hour_label)
+        cell.append(spin)
+        grid.attach(cell, index % 4, index // 4, 1, 1)
+
+    container.append(grid)
+
+    def get_samples():
+        return [
+            HourlyEnergySample(hour=hour, level=spin.get_value())
+            for hour, spin in sorted(spins.items())
+        ]
+
+    def set_samples(new_samples: Sequence[HourlyEnergySample]):
+        for sample in _normalize_hourly_samples(new_samples):
+            spin = spins.get(sample.hour)
+            if spin is not None:
+                spin.set_value(sample.level)
+
+    return {"container": container, "get_samples": get_samples, "set_samples": set_samples}
+
+
+def _normalize_hourly_samples(hourly_samples: Sequence[HourlyEnergySample]) -> List[HourlyEnergySample]:
+    levels = {sample.hour: _sanitize_level(sample.level) for sample in build_default_hourly_samples()}
+    for sample in hourly_samples:
+        hour = max(DAY_START_HOUR, min(DAY_END_HOUR, int(sample.hour)))
+        levels[hour] = _sanitize_level(sample.level)
+    return [HourlyEnergySample(hour=hour, level=levels[hour]) for hour in range(DAY_START_HOUR, DAY_END_HOUR + 1)]
+
+
 def _create_curve_editor():
     class EnergyCurveEditor(Gtk.DrawingArea):
         def __init__(self):
             super().__init__()
             layout = build_curve_editor_layout()
-            self.points = [
-                CurvePoint(0, 6.0),
-                CurvePoint(240, 7.5),
-                CurvePoint(540, 4.5),
-                CurvePoint(900, 5.0),
-            ]
+            self.points = list(DEFAULT_CURVE_POINTS)
+            self.on_curve_changed = None
             self.set_hexpand(True)
             self.set_vexpand(False)
             self.set_size_request(layout.minimum_width, layout.height)
@@ -372,12 +524,22 @@ def _create_curve_editor():
             self._drag_origin_x = start_x
             self._drag_origin_y = start_y
             self.queue_draw()
+            self._emit_curve_changed()
 
         def _on_drag_update(self, _gesture, offset_x, offset_y):
             point = self._point_from_coords(self._drag_origin_x + offset_x, self._drag_origin_y + offset_y)
             self.points.append(point)
             self.points = _sort_points(self.points)
             self.queue_draw()
+            self._emit_curve_changed()
+
+        def set_points(self, points: Sequence[CurvePoint]):
+            self.points = _sort_points(points)
+            self.queue_draw()
+
+        def _emit_curve_changed(self):
+            if callable(self.on_curve_changed):
+                self.on_curve_changed(list(self.points))
 
         def _point_from_coords(self, x, y):
             width = max(self.get_width(), 1)
