@@ -24,8 +24,9 @@
       ],
       "sources": [
         {
-          "type": "dir",
-          "path": "./"
+          "type": "archive",
+          "url": "https://github.com/srpvpn/pulse/archive/refs/tags/0.1.0.tar.gz",
+          "sha256": "8b94fc214d02053633ce236a6b24526d4bc2800c37d499cb477d528f5875004c"
         }
       ]
     }
