@@ -115,6 +115,32 @@ class PulseApplication(ApplicationBase):
         self.database = Database(self.data_dir / "pulse.db")
         self._notification_source_id = None
         self.database.initialize()
+        self._install_app_actions()
+
+    def _install_app_actions(self) -> None:
+        if Gio is None or not hasattr(Gio, "SimpleAction") or not hasattr(self, "add_action"):
+            return
+
+        quit_action = Gio.SimpleAction.new("quit", None)
+        quit_action.connect("activate", self._handle_quit_action)
+        self.add_action(quit_action)
+
+        preferences_action = Gio.SimpleAction.new("preferences", None)
+        preferences_action.connect("activate", self._handle_preferences_action)
+        self.add_action(preferences_action)
+
+        if hasattr(self, "set_accels_for_action"):
+            self.set_accels_for_action("app.quit", ["<Primary>q"])
+            self.set_accels_for_action("app.preferences", ["<Primary>comma"])
+
+    def _handle_quit_action(self, *_args) -> None:
+        if hasattr(self, "quit"):
+            self.quit()
+
+    def _handle_preferences_action(self, *_args) -> None:
+        window = getattr(self, "_window", None)
+        if window is not None and hasattr(window, "show_settings_view"):
+            window.show_settings_view()
 
     def load_settings(self) -> PulseSettings:
         if not self.settings_path.exists():

@@ -49,6 +49,21 @@ def _load_adw():
 Adw, Gtk = _load_adw()
 
 
+def _load_gio():
+    try:
+        import gi
+
+        gi.require_version("Gio", "2.0")
+        from gi.repository import Gio  # type: ignore
+
+        return Gio
+    except (ImportError, ValueError):
+        return None
+
+
+Gio = _load_gio()
+
+
 SIDEBAR_COLLAPSE_WIDTH = 1080
 
 
@@ -111,6 +126,7 @@ class PulseMainWindow(WindowBase):
             self._shell_breakpoint = None
             self._toast_overlay = Adw.ToastOverlay()
             self.set_content(self._toast_overlay)
+            self._install_window_actions()
             self.connect("notify::width", self._on_width_changed)
             self._rebuild_content()
 
@@ -161,6 +177,27 @@ class PulseMainWindow(WindowBase):
             self._toast_overlay.add_toast(toast)
         except Exception:
             return
+
+    def _install_window_actions(self) -> None:
+        if Gio is None or not hasattr(Gio, "SimpleAction") or not hasattr(self, "add_action"):
+            return
+
+        toggle_sidebar = Gio.SimpleAction.new("toggle-sidebar", None)
+        toggle_sidebar.connect("activate", self._handle_toggle_sidebar_action)
+        self.add_action(toggle_sidebar)
+
+        application = getattr(self, "application", None)
+        if application is not None and hasattr(application, "set_accels_for_action"):
+            application.set_accels_for_action("win.toggle-sidebar", ["F9"])
+
+    def _handle_toggle_sidebar_action(self, *_args) -> None:
+        self._on_sidebar_toggle_clicked(None)
+
+    def show_settings_view(self) -> None:
+        self.current_view = "settings"
+        self._set_visible_view("settings")
+        if self._split_view is not None:
+            self._sync_split_view_layout(force_hide=self._is_split_view_collapsed())
 
     def _build_shell(self):
         self._nav_buttons = {}

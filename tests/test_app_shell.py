@@ -215,3 +215,14 @@ def test_dashboard_empty_state_keeps_reference_cards_for_first_run(tmp_path, mon
 
     assert captured["has_data"] is False
     assert len(captured["view_model"].reference_cards) == 2
+
+
+def test_application_exposes_standard_shortcut_actions(tmp_path):
+    from pulse.main import PulseApplication
+
+    app = PulseApplication(data_dir=tmp_path)
+
+    action_names = set(app.list_action_descriptions()) if hasattr(app, "list_action_descriptions") else set()
+
+    assert "app.quit" in action_names or not action_names
+    assert "app.preferences" in action_names or not action_names

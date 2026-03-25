@@ -88,6 +88,46 @@ DARK_THEME_COLORS = {
 }
 
 
+HIGH_CONTRAST_LIGHT_COLORS = {
+    "bg": "#FFFFFF",
+    "surface": "#FFFFFF",
+    "surface_soft": "#FFFFFF",
+    "surface_glass_border": "#000000",
+    "text": "#000000",
+    "muted": "#1F1F1F",
+    "accent": "#000000",
+    "accent_soft": "#FFFFFF",
+    "border": "#000000",
+    "hover": "#D9D9D9",
+    "surface_border": "#000000",
+    "period_border": "#000000",
+    "bottom_bar": "#FFFFFF",
+    "mobile_header": "#FFFFFF",
+    "heatmap_grid": "#FFFFFF",
+    "rhythm_block": "#FFFFFF",
+}
+
+
+HIGH_CONTRAST_DARK_COLORS = {
+    "bg": "#000000",
+    "surface": "#000000",
+    "surface_soft": "#000000",
+    "surface_glass_border": "#FFFFFF",
+    "text": "#FFFFFF",
+    "muted": "#F2F2F2",
+    "accent": "#FFFFFF",
+    "accent_soft": "#000000",
+    "border": "#FFFFFF",
+    "hover": "#2A2A2A",
+    "surface_border": "#FFFFFF",
+    "period_border": "#FFFFFF",
+    "bottom_bar": "#000000",
+    "mobile_header": "#000000",
+    "heatmap_grid": "#000000",
+    "rhythm_block": "#000000",
+}
+
+
 PAGE_LAYOUTS = {
     "onboarding": PageLayoutSpec(max_width=1040),
     "dashboard": PageLayoutSpec(max_width=1080),
@@ -124,9 +164,12 @@ def resolve_theme_palette_mode(theme_mode: str, prefer_dark: bool = False) -> st
     return "dark" if prefer_dark else "light"
 
 
-def build_theme_css(theme_mode: str, prefer_dark: bool = False) -> str:
+def build_theme_css(theme_mode: str, prefer_dark: bool = False, high_contrast: bool = False) -> str:
     palette_mode = resolve_theme_palette_mode(theme_mode, prefer_dark=prefer_dark)
-    colors = LIGHT_THEME_COLORS if palette_mode != "dark" else DARK_THEME_COLORS
+    if high_contrast:
+        colors = HIGH_CONTRAST_LIGHT_COLORS if palette_mode != "dark" else HIGH_CONTRAST_DARK_COLORS
+    else:
+        colors = LIGHT_THEME_COLORS if palette_mode != "dark" else DARK_THEME_COLORS
     return """
 .pulse-root {
   background: %(bg)s;
@@ -337,6 +380,11 @@ def build_theme_css(theme_mode: str, prefer_dark: bool = False) -> str:
   border-radius: 16px;
   font-weight: 600;
 }
+
+*:focus {
+  outline: 2px solid %(accent)s;
+  outline-offset: 2px;
+}
 """ % colors
 
 
@@ -355,11 +403,20 @@ def install_theme(display=None, theme_mode: str = "system") -> None:
     if target_display is None:
         return
     prefer_dark = False
+    high_contrast = False
     if Adw is not None and hasattr(Adw, "StyleManager"):
         style_manager = Adw.StyleManager.get_default()
         if style_manager is not None and hasattr(style_manager, "get_dark"):
             prefer_dark = bool(style_manager.get_dark())
-    provider.load_from_data(build_theme_css(theme_mode, prefer_dark=prefer_dark).encode("utf-8"))
+        if style_manager is not None and hasattr(style_manager, "get_high_contrast"):
+            high_contrast = bool(style_manager.get_high_contrast())
+    provider.load_from_data(
+        build_theme_css(
+            theme_mode,
+            prefer_dark=prefer_dark,
+            high_contrast=high_contrast,
+        ).encode("utf-8")
+    )
     Gtk.StyleContext.add_provider_for_display(
         target_display,
         provider,

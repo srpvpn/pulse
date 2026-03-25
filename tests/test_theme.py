@@ -43,3 +43,13 @@ def test_build_theme_css_respects_system_palette_preference():
 
     assert "#F3F4F6" in system_light_css
     assert "#0F172A" in system_dark_css
+
+
+def test_build_theme_css_supports_high_contrast_palette():
+    from pulse.ui.theme import build_theme_css
+
+    high_contrast_css = build_theme_css("light", high_contrast=True)
+
+    assert "#000000" in high_contrast_css
+    assert "#FFFFFF" in high_contrast_css
+    assert "#6B7280" not in high_contrast_css
