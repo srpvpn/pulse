@@ -32,6 +32,13 @@ If you want sample data for a quick preview:
 python3 -m pulse.main --seed-demo
 ```
 
+Run it as a local Flatpak build:
+
+```bash
+flatpak-builder --user --install --force-clean --disable-rofiles-fuse --repo=repo builddir io.github.srpvpn.pulse.json
+flatpak run io.github.srpvpn.pulse
+```
+
 ## Tests
 
 ```bash
