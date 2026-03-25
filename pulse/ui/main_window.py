@@ -262,6 +262,8 @@ class PulseMainWindow(WindowBase):
             toggle.set_icon_name("sidebar-show-symbolic")
         else:
             toggle.set_label("Menu")
+        if hasattr(toggle, "set_tooltip_text"):
+            toggle.set_tooltip_text("Show navigation")
         toggle.connect("clicked", self._on_sidebar_toggle_clicked)
         apply_classes(toggle, "pulse-mobile-toggle")
 

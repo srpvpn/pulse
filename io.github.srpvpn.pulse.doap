@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+         xmlns:foaf="http://xmlns.com/foaf/0.1/"
+         xmlns:doap="http://usefulinc.com/ns/doap#">
+  <name>Pulse</name>
+  <shortdesc xml:lang="en">Local-first burnout and energy tracker for GNOME</shortdesc>
+  <homepage rdf:resource="https://github.com/srpvpn/pulse" />
+  <bug-database rdf:resource="https://github.com/srpvpn/pulse/issues" />
+  <download-page rdf:resource="https://github.com/srpvpn/pulse" />
+  <category rdf:resource="https://api.gnome.org/doap-extensions#apps" />
+  <programming-language>Python</programming-language>
+  <license rdf:resource="https://spdx.org/licenses/GPL-3.0-or-later.html" />
+  <maintainer>
+    <foaf:Person>
+      <foaf:name>srpvpn</foaf:name>
+    </foaf:Person>
+  </maintainer>
+  <repository>
+    <doap:GitRepository>
+      <doap:browse rdf:resource="https://github.com/srpvpn/pulse" />
+      <doap:location rdf:resource="https://github.com/srpvpn/pulse.git" />
+    </doap:GitRepository>
+  </repository>
+  <release>
+    <doap:Version>
+      <name>0.1.0</name>
+      <revision>0.1.0</revision>
+      <created>2026-03-24</created>
+    </doap:Version>
+  </release>
+  <rdfs:seeAlso rdf:resource="https://github.com/srpvpn/pulse/blob/main/data/io.github.srpvpn.pulse.metainfo.xml" />
+  <rdfs:seeAlso rdf:resource="https://github.com/srpvpn/pulse/blob/main/io.github.srpvpn.pulse.json" />
+  <rdfs:seeAlso rdf:resource="https://github.com/srpvpn/pulse/blob/main/CONTRIBUTING.md" />
+  <rdfs:comment>Application ID: io.github.srpvpn.pulse</rdfs:comment>
+</Project>

@@ -21,6 +21,8 @@
   </developer>
   <url type="homepage">https://github.com/srpvpn/pulse</url>
   <url type="bugtracker">https://github.com/srpvpn/pulse/issues</url>
+  <url type="help">https://github.com/srpvpn/pulse#readme</url>
+  <url type="contribute">https://github.com/srpvpn/pulse/blob/main/CONTRIBUTING.md</url>
   <url type="vcs-browser">https://github.com/srpvpn/pulse</url>
   <content_rating type="oars-1.1" />
   <branding>
@@ -51,4 +53,8 @@
   <requires>
     <display_length compare="ge">360</display_length>
   </requires>
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
 </component>

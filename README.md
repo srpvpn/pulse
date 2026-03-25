@@ -50,3 +50,4 @@ python3 -m pytest tests -v
 - Built for GNOME with GTK 4 and Libadwaita
 - Supports light and dark appearance
 - Uses the application ID `io.github.srpvpn.pulse`
+- Follows the [GNOME Code of Conduct](https://conduct.gnome.org/)

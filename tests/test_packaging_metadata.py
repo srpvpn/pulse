@@ -48,7 +48,17 @@ def test_metainfo_contains_circle_relevant_core_fields():
     assert root.findtext("project_license") == "GPL-3.0-or-later"
     assert root.findtext("summary")
     assert root.findtext("url[@type='homepage']")
+    assert root.findtext("url[@type='bugtracker']")
+    assert root.findtext("url[@type='contribute']")
+    assert root.findtext("url[@type='help']")
     assert root.find("screenshots") is not None
+    requires = root.find("requires")
+    assert requires is not None
+    assert requires.findtext("display_length") == "360"
+    recommends = root.find("recommends")
+    assert recommends is not None
+    control_values = {control.text for control in recommends.findall("control")}
+    assert {"keyboard", "pointing"}.issubset(control_values)
 
 
 def test_packaging_icon_exists():
@@ -90,10 +100,30 @@ def test_repository_has_osi_approved_license_file():
     assert "Version 3" in content
 
 
-def test_readme_mentions_flatpak_and_appstream_readiness():
+def test_repository_has_doap_metadata_file():
+    doap_path = REPO_ROOT / "io.github.srpvpn.pulse.doap"
+
+    assert doap_path.exists()
+
+    content = doap_path.read_text(encoding="utf-8")
+    assert "<name>Pulse</name>" in content
+    assert APP_ID in content
+
+
+def test_repository_has_ci_workflow():
+    workflow_path = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+
+    assert workflow_path.exists()
+
+    content = workflow_path.read_text(encoding="utf-8")
+    assert "python3 -m pytest tests -v" in content
+    assert "desktop-file-validate data/io.github.srpvpn.pulse.desktop" in content
+
+
+def test_readme_mentions_flatpak_and_code_of_conduct():
     readme_path = REPO_ROOT / "README.md"
 
     content = readme_path.read_text(encoding="utf-8")
 
     assert "Flatpak" in content
-    assert "AppStream" in content
+    assert "Code of Conduct" in content
