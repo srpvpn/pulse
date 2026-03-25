@@ -17,6 +17,7 @@ def test_main_window_defaults_to_sidebar_shell_after_onboarding():
     assert window.supports_narrow_layout is True
     assert window.uses_overlay_split_view is True
     assert window.uses_window_breakpoints is True
+    assert window.uses_header_bar_top_chrome is True
 
 
 def test_layout_mode_switches_for_narrow_widths():

@@ -1,6 +1,7 @@
 """Application entry point for Pulse."""
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -78,6 +79,13 @@ Gio = _load_gio()
 GLib = _load_glib()
 
 
+def _default_data_dir(application_id: str) -> Path:
+    xdg_data_home = os.environ.get("XDG_DATA_HOME")
+    if xdg_data_home:
+        return Path(xdg_data_home) / application_id
+    return Path.home() / ".local" / "share" / application_id
+
+
 if Adw is None:
     class _FallbackApplication(object):
         def __init__(self, application_id: Optional[str] = None, **kwargs) -> None:
@@ -102,7 +110,7 @@ class PulseApplication(ApplicationBase):
     def __init__(self, application_id: str = "io.github.srpvpn.Pulse", data_dir: Optional[Path] = None) -> None:
         super(PulseApplication, self).__init__(application_id=application_id)
         self.application_id = application_id
-        self.data_dir = Path(data_dir) if data_dir is not None else Path.cwd()
+        self.data_dir = Path(data_dir) if data_dir is not None else _default_data_dir(application_id)
         self.settings_path = self.data_dir / "pulse-settings.json"
         self.database = Database(self.data_dir / "pulse.db")
         self._notification_source_id = None

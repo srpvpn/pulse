@@ -66,7 +66,7 @@ def test_repository_includes_screenshot_placeholders_for_appstream_listing():
 
 
 def test_flatpak_manifest_targets_gnome_runtime():
-    manifest_path = REPO_ROOT / "build-aux" / "flatpak" / "{}.json".format(APP_ID)
+    manifest_path = REPO_ROOT / "{}.json".format(APP_ID)
 
     assert manifest_path.exists()
 
@@ -74,8 +74,10 @@ def test_flatpak_manifest_targets_gnome_runtime():
 
     assert manifest["app-id"] == APP_ID
     assert manifest["runtime"] == "org.gnome.Platform"
+    assert manifest["runtime-version"] == "49"
     assert manifest["sdk"] == "org.gnome.Sdk"
     assert manifest["command"] == "pulse"
+    assert manifest["modules"][0]["sources"][0]["path"] == "./"
 
 
 def test_repository_has_osi_approved_license_file():

@@ -186,3 +186,32 @@ def test_latest_mbi_correction_uses_saved_checkin_directly(tmp_path):
     )
 
     assert window._latest_mbi_correction() == -10.0
+
+
+def test_dashboard_empty_state_keeps_reference_cards_for_first_run(tmp_path, monkeypatch):
+    from pulse.main import AppShellState, PulseApplication
+    import pulse.ui.main_window as main_window_module
+    from pulse.ui.main_window import PulseMainWindow
+
+    captured = {}
+    original_create_dashboard_page = main_window_module.create_dashboard_page
+
+    def fake_create_dashboard_page(view_model, has_data=True):
+        captured["view_model"] = view_model
+        captured["has_data"] = has_data
+        return view_model
+
+    monkeypatch.setattr(main_window_module, "create_dashboard_page", fake_create_dashboard_page)
+
+    try:
+        app = PulseApplication(data_dir=tmp_path)
+        window = PulseMainWindow(
+            application=app,
+            initial_state=AppShellState(current_view="dashboard", reminder_time="20:00"),
+        )
+        window._build_dashboard_page()
+    finally:
+        monkeypatch.setattr(main_window_module, "create_dashboard_page", original_create_dashboard_page)
+
+    assert captured["has_data"] is False
+    assert len(captured["view_model"].reference_cards) == 2

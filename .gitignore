@@ -8,3 +8,6 @@ AGENTS.md
 docs/
 design-*.html
 react-app*.js
+builddir/
+repo/
+.flatpak-builder/

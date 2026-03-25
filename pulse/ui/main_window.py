@@ -62,6 +62,7 @@ if Adw is None or Gtk is None:
             self.application = application
             self.kwargs = kwargs
             self.title = "Pulse"
+            self.uses_header_bar_top_chrome = False
 
         def present(self) -> None:
             return None
@@ -83,6 +84,7 @@ class PulseMainWindow(WindowBase):
         self.supports_narrow_layout = True
         self.uses_overlay_split_view = True
         self.uses_window_breakpoints = True
+        self.uses_header_bar_top_chrome = True
         self.current_view = getattr(initial_state, "current_view", "onboarding")
         self.reminder_time = getattr(initial_state, "reminder_time", "20:00")
         self.language = getattr(initial_state, "language", "en")
@@ -105,6 +107,7 @@ class PulseMainWindow(WindowBase):
             self._layout_mode = "wide"
             self._split_view = None
             self._compact_header = None
+            self._window_header_bar = None
             self._shell_breakpoint = None
             self._toast_overlay = Adw.ToastOverlay()
             self.set_content(self._toast_overlay)
@@ -127,7 +130,7 @@ class PulseMainWindow(WindowBase):
             child = create_onboarding_page(self.reminder_time, self._handle_onboarding_complete, language=self.language)
         else:
             child = self._build_shell()
-        self._toast_overlay.set_child(child)
+        self._toast_overlay.set_child(self._wrap_with_window_chrome(child))
 
     def _handle_onboarding_complete(self, reminder_time: str) -> None:
         if self.application is not None and hasattr(self.application, "complete_onboarding"):
@@ -181,6 +184,17 @@ class PulseMainWindow(WindowBase):
         root.append(canvas)
         self._set_visible_view(self.current_view if self.current_view != "onboarding" else "dashboard")
         return root
+
+    def _wrap_with_window_chrome(self, child):
+        if Adw is None or child is None:
+            return child
+        if not hasattr(Adw, "ToolbarView"):
+            return child
+        toolbar_view = Adw.ToolbarView()
+        header_bar = self._build_window_header_bar()
+        toolbar_view.add_top_bar(header_bar)
+        toolbar_view.set_content(child)
+        return toolbar_view
 
     def _build_overlay_split_shell(self):
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -263,6 +277,18 @@ class PulseMainWindow(WindowBase):
         header.append(toggle)
         header.append(title_group)
         return header
+
+    def _build_window_header_bar(self):
+        if Adw is None:
+            return None
+        header_bar = Adw.HeaderBar()
+        if hasattr(header_bar, "set_show_title"):
+            header_bar.set_show_title(True)
+        if hasattr(header_bar, "set_show_start_title_buttons"):
+            header_bar.set_show_start_title_buttons(True)
+        if hasattr(header_bar, "set_show_end_title_buttons"):
+            header_bar.set_show_end_title_buttons(True)
+        return header_bar
 
     def _build_sidebar(self):
         sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
@@ -427,25 +453,26 @@ class PulseMainWindow(WindowBase):
             ultradian_cycles = estimate_ultradian_cycles(self._latest_intraday_samples())
             view_model = build_dashboard_view_model(burnout, advice, ultradian_cycles=ultradian_cycles, language=self.language)
         else:
+            empty_state = build_dashboard_view_model(
+                BurnoutScoreResult(score=50.0, ali=0.0, rqs=50.0, trend_penalty=0.0, mbi_correction=0.0),
+                None,
+                ultradian_cycles=0,
+                language=self.language,
+            )
             view_model = DashboardViewModel(
-                score=50.0,
-                score_zone=build_dashboard_view_model(
-                    BurnoutScoreResult(score=50.0, ali=0.0, rqs=50.0, trend_penalty=0.0, mbi_correction=0.0),
-                    None,
-                    ultradian_cycles=0,
-                    language=self.language,
-                ).score_zone,
+                score=empty_state.score,
+                score_zone=empty_state.score_zone,
                 primary_message=tr(self.language, "dashboard.no_baseline"),
                 primary_action=tr(self.language, "dashboard.open_evening"),
                 primary_science_ref=tr(self.language, "dashboard.predictive_note"),
-                ultradian_cycles=0,
-                score_label="50",
-                zone_pill="",
-                secondary_metrics=[],
-                headline=tr(self.language, "dashboard.headline"),
-                score_card_title=tr(self.language, "dashboard.score_title"),
-                insight_title=tr(self.language, "dashboard.insight_title"),
-                reference_cards=[],
+                ultradian_cycles=empty_state.ultradian_cycles,
+                score_label=empty_state.score_label,
+                zone_pill=empty_state.zone_pill,
+                secondary_metrics=empty_state.secondary_metrics,
+                headline=empty_state.headline,
+                score_card_title=empty_state.score_card_title,
+                insight_title=empty_state.insight_title,
+                reference_cards=empty_state.reference_cards,
             )
         return create_dashboard_page(view_model, has_data=has_data)
 

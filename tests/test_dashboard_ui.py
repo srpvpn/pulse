@@ -45,3 +45,22 @@ def test_dashboard_view_model_matches_reference_composition():
     ]
     assert view_model.reference_cards[0].items == ["Load is stable"]
     assert view_model.reference_cards[1].items == ["2 completed today"]
+
+
+def test_empty_dashboard_state_keeps_reference_cards_for_first_run():
+    from pulse.burnout_engine import BurnoutScoreResult
+    from pulse.ui.dashboard import build_dashboard_view_model
+
+    score = BurnoutScoreResult(
+        score=50.0,
+        ali=0.0,
+        rqs=50.0,
+        trend_penalty=0.0,
+        mbi_correction=0.0,
+    )
+
+    view_model = build_dashboard_view_model(score, None, ultradian_cycles=0)
+
+    assert len(view_model.reference_cards) == 2
+    assert view_model.reference_cards[0].label == "Recovery direction"
+    assert view_model.reference_cards[1].label == "Ultradian cycles"
