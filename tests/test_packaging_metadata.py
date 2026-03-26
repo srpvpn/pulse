@@ -85,7 +85,7 @@ def test_flatpak_manifest_targets_gnome_runtime():
 
     assert manifest["app-id"] == APP_ID
     assert manifest["runtime"] == "org.gnome.Platform"
-    assert manifest["runtime-version"] == "49"
+    assert manifest["runtime-version"] == "50"
     assert manifest["sdk"] == "org.gnome.Sdk"
     assert manifest["command"] == "pulse"
     build_commands = manifest["modules"][0]["build-commands"]
