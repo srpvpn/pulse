@@ -95,7 +95,7 @@ def test_flatpak_manifest_targets_gnome_runtime():
     )
     source = manifest["modules"][0]["sources"][0]
     assert source["type"] == "archive"
-    assert source["url"] == "https://github.com/srpvpn/pulse/archive/refs/tags/0.1.0.tar.gz"
+    assert source["url"] == "https://github.com/srpvpn/pulse/archive/refs/tags/0.1.1.tar.gz"
     assert len(source["sha256"]) == 64
 
 

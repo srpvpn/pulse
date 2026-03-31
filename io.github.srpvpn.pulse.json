@@ -26,8 +26,8 @@
       "sources": [
         {
           "type": "archive",
-          "url": "https://github.com/srpvpn/pulse/archive/refs/tags/0.1.0.tar.gz",
-          "sha256": "8b94fc214d02053633ce236a6b24526d4bc2800c37d499cb477d528f5875004c"
+          "url": "https://github.com/srpvpn/pulse/archive/refs/tags/0.1.1.tar.gz",
+          "sha256": "1c06da1cba42fc09cfe9b4af7c731c3053e10243858fcaf7f1d07e8c830c03d9"
         }
       ]
     }
