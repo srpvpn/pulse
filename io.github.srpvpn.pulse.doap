@@ -24,8 +24,8 @@
   </repository>
   <release>
     <doap:Version>
-      <name>0.1.0</name>
-      <revision>0.1.0</revision>
+      <name>0.1.1</name>
+      <revision>0.1.1</revision>
       <created>2026-03-24</created>
     </doap:Version>
   </release>

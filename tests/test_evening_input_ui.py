@@ -17,6 +17,8 @@ def test_evening_page_model_describes_sections_and_primary_action():
     assert view_model.fills_viewport is True
     assert view_model.large_primary_action is True
     assert view_model.keyboard_editor_hidden_by_default is True
+    assert view_model.sleep_scale_draws_value is False
+    assert view_model.sleep_scale_focusable is False
     assert view_model.max_content_width == 960
     assert view_model.responsive_layout is True
     assert view_model.scroll_policy == "automatic"

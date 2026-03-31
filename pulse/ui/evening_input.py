@@ -44,6 +44,8 @@ class EveningPageModel:
     fills_viewport: bool
     large_primary_action: bool
     keyboard_editor_hidden_by_default: bool
+    sleep_scale_draws_value: bool
+    sleep_scale_focusable: bool
     max_content_width: int
     responsive_layout: bool
     scroll_policy: str
@@ -71,6 +73,8 @@ def build_evening_page_model(language: str = "en") -> EveningPageModel:
         fills_viewport=True,
         large_primary_action=True,
         keyboard_editor_hidden_by_default=True,
+        sleep_scale_draws_value=False,
+        sleep_scale_focusable=False,
         max_content_width=960,
         responsive_layout=True,
         scroll_policy="automatic",
@@ -178,6 +182,10 @@ def _sanitize_level(level: object) -> float:
     except (TypeError, ValueError):
         value = 1.0
     return max(1.0, min(10.0, value))
+
+
+def _format_sleep_hours(hours: float) -> str:
+    return "{:.1f} h".format(hours)
 
 
 def _catmull_rom_interpolate(
@@ -323,10 +331,25 @@ def create_evening_page(
     recovery_title = Gtk.Label(label=page.section_titles[1], xalign=0.0)
     apply_classes(recovery_title, "heading")
     sleep_row.append(recovery_title)
-    sleep_row.append(Gtk.Label(label=tr(language, "evening.sleep_hours"), xalign=0.0))
+    sleep_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+    sleep_label = Gtk.Label(label=tr(language, "evening.sleep_hours"), xalign=0.0)
+    sleep_label.set_hexpand(True)
+    sleep_value = Gtk.Label(label=_format_sleep_hours(7.0), xalign=1.0)
+    apply_classes(sleep_value, "pulse-subtle")
+    sleep_header.append(sleep_label)
+    sleep_header.append(sleep_value)
+    sleep_row.append(sleep_header)
     sleep_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 4.0, 10.0, 0.5)
     sleep_scale.set_value(7.0)
-    sleep_scale.set_draw_value(True)
+    sleep_scale.set_draw_value(page.sleep_scale_draws_value)
+    if hasattr(sleep_scale, "set_focusable"):
+        sleep_scale.set_focusable(page.sleep_scale_focusable)
+    elif hasattr(sleep_scale, "set_can_focus"):
+        sleep_scale.set_can_focus(page.sleep_scale_focusable)
+    sleep_scale.connect(
+        "value-changed",
+        lambda scale: sleep_value.set_text(_format_sleep_hours(scale.get_value())),
+    )
     sleep_row.append(sleep_scale)
     content.append(sleep_row)
 
