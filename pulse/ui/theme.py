@@ -170,6 +170,12 @@ def build_theme_css(theme_mode: str, prefer_dark: bool = False, high_contrast: b
         colors = HIGH_CONTRAST_LIGHT_COLORS if palette_mode != "dark" else HIGH_CONTRAST_DARK_COLORS
     else:
         colors = LIGHT_THEME_COLORS if palette_mode != "dark" else DARK_THEME_COLORS
+    focus_css = """
+*:focus {
+  outline: 2px solid %(accent)s;
+  outline-offset: 2px;
+}
+""" if high_contrast else ""
     return """
 .pulse-root {
   background: %(bg)s;
@@ -380,12 +386,8 @@ def build_theme_css(theme_mode: str, prefer_dark: bool = False, high_contrast: b
   border-radius: 16px;
   font-weight: 600;
 }
-
-*:focus {
-  outline: 2px solid %(accent)s;
-  outline-offset: 2px;
-}
-""" % colors
+%(focus_css)s
+""" % {**colors, "focus_css": focus_css % colors if high_contrast else ""}
 
 
 _theme_provider: Optional[object] = None

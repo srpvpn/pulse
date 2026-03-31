@@ -48,8 +48,11 @@ def test_build_theme_css_respects_system_palette_preference():
 def test_build_theme_css_supports_high_contrast_palette():
     from pulse.ui.theme import build_theme_css
 
+    light_css = build_theme_css("light")
     high_contrast_css = build_theme_css("light", high_contrast=True)
 
+    assert "outline: 2px solid" not in light_css
     assert "#000000" in high_contrast_css
     assert "#FFFFFF" in high_contrast_css
     assert "#6B7280" not in high_contrast_css
+    assert "outline: 2px solid" in high_contrast_css
