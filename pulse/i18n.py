@@ -1,6 +1,6 @@
 """Minimal localization helpers for Pulse."""
 
-SUPPORTED_LANGUAGES = ("en", "ru")
+SUPPORTED_LANGUAGES = ("en", "ru", "it")
 
 WEEKDAY_LABELS = {
     "en": {
@@ -14,6 +14,7 @@ WEEKDAY_LABELS = {
     "it": {
         "full": ("lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"),
         "short": ("lun", "mar", "mer", "gio", "ven", "sab", "dom"),
+    },
 }
 
 MONTH_LABELS = {
@@ -43,6 +44,7 @@ STRINGS = {
         "settings.saved": "Settings saved",
         "language.english": "English",
         "language.russian": "Русский",
+        "language.italian": "Italian",
         "toast.reminder_saved": "Evening reminder saved",
         "toast.day_saved": "Day saved",
         "toast.review_saved": "Weekly review saved",
@@ -244,6 +246,7 @@ STRINGS = {
         "settings.saved": "Настройки сохранены",
         "language.english": "English",
         "language.russian": "Русский",
+        "language.italian": "Итальянский",
         "toast.reminder_saved": "Вечернее напоминание сохранено",
         "toast.day_saved": "День сохранён",
         "toast.review_saved": "Недельный обзор сохранён",
@@ -445,6 +448,7 @@ STRINGS = {
         "settings.saved": "Impostazioni salvate",
         "language.english": "Inglese",
         "language.russian": "Russo",
+        "language.italian": "Italiano",
         "toast.reminder_saved": "Promemoria serale salvato",
         "toast.day_saved": "Giornata salvata",
         "toast.review_saved": "Revisione settimanale salvata",

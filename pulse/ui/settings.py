@@ -26,6 +26,7 @@ def build_settings_page_model(language: str, theme_mode: str) -> SettingsPageMod
         language_options=(
             ("en", tr(language, "language.english")),
             ("ru", tr(language, "language.russian")),
+            ("it", tr(language, "language.italian")),
         ),
         theme_title=tr(language, "settings.theme_title"),
         current_theme_mode=theme_mode,
